@@ -1,0 +1,771 @@
+<title>Agents</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Doto:wght@800;900&family=Martian+Mono:wdth,wght@75..112.5,300..600&display=swap">
+<style>
+  /* Agents mockup. Follows the viewer's appearance by default; the switch previews Light or the Dark instrument
+     appearance. Tokens use light-dark(), so only color-scheme changes between appearances. Values match DESIGN.md §4. */
+  :root {
+    color-scheme: light;
+    --ground: light-dark(#E6EDEB, #0B1012);
+    --ink: light-dark(#142022, #E7ECE9);
+    --ink-2: light-dark(#4A5956, #9AA7A3);
+    --ink-3: light-dark(#647370, #7C8A86);
+    --rule: light-dark(rgba(20, 32, 34, 0.10), rgba(214, 236, 229, 0.09));
+    --rule-strong: light-dark(rgba(20, 32, 34, 0.18), rgba(214, 236, 229, 0.18));
+    --amber: light-dark(#A35F00, #FFB547);
+    --amber-dot: light-dark(#C97700, #FFB547);
+    --phosphor: light-dark(#0E7F71, #62E3CF);
+    --phosphor-dot: light-dark(#0F9A89, #62E3CF);
+    --fault: light-dark(#C2392A, #FF6A5C);
+    --fault-dot: light-dark(#E0483A, #FF6A5C);
+    --spent: light-dark(#8A9794, #7E8C88);
+    --claude: light-dark(#9A5530, #E9B394);
+    --codex: light-dark(#4257B2, #B7C4F5);
+    --glass: light-dark(rgba(248, 250, 249, 0.74), rgba(18, 24, 26, 0.62));
+    --glass-edge: light-dark(rgba(20, 32, 34, 0.08), rgba(255, 255, 255, 0.09));
+    --glass-hi: light-dark(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.12));
+    --glass-opaque: light-dark(#F4F7F6, #12181A);
+    --wall-a: light-dark(#BBD8D4, #1C424A);
+    --wall-b: light-dark(#F0D2B0, #4E3018);
+    --wall-c: light-dark(#D3E5E2, #11262B);
+    --wall-top: light-dark(#EEF3F2, #0C1619);
+    --wall-bottom: light-dark(#D9E3E1, #090D0F);
+    --menubar-bg: light-dark(rgba(255, 255, 255, 0.42), rgba(8, 12, 14, 0.32));
+    --menubar-ink: light-dark(rgba(20, 28, 30, 0.9), rgba(255, 255, 255, 0.9));
+    --glyph-active: light-dark(rgba(20, 32, 34, 0.12), rgba(255, 255, 255, 0.16));
+    --dot-dim: light-dark(rgba(20, 32, 34, 0.2), rgba(255, 255, 255, 0.22));
+    --dash: light-dark(rgba(20, 32, 34, 0.55), rgba(255, 255, 255, 0.6));
+    --hover: light-dark(rgba(20, 32, 34, 0.05), rgba(255, 255, 255, 0.05));
+    --open-bg: light-dark(rgba(15, 154, 137, 0.09), rgba(98, 227, 207, 0.07));
+    --open-edge: light-dark(rgba(15, 154, 137, 0.24), rgba(98, 227, 207, 0.16));
+    --tag-fault-bg: light-dark(rgba(194, 57, 42, 0.1), rgba(255, 106, 92, 0.12));
+    --tag-warn-bg: light-dark(rgba(163, 95, 0, 0.1), rgba(255, 181, 71, 0.12));
+    --tag-here-bg: light-dark(rgba(14, 127, 113, 0.1), rgba(98, 227, 207, 0.1));
+    --tag-quiet-bg: light-dark(rgba(20, 32, 34, 0.07), rgba(255, 255, 255, 0.07));
+    --act-bg: light-dark(rgba(20, 32, 34, 0.07), rgba(255, 255, 255, 0.09));
+    --act-hover: light-dark(rgba(20, 32, 34, 0.12), rgba(255, 255, 255, 0.15));
+    --act-primary: light-dark(#142022, rgba(240, 245, 242, 0.92));
+    --act-primary-ink: light-dark(#F4F7F6, #0B1012);
+    --act-primary-hover: light-dark(#000000, #FFFFFF);
+    --field: light-dark(rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.06));
+    --spec-top: light-dark(rgba(255, 255, 255, 0.75), rgba(40, 60, 64, 0.55));
+    --spec-bottom: light-dark(rgba(222, 231, 229, 0.75), rgba(22, 30, 33, 0.55));
+    --notif: light-dark(rgba(250, 252, 251, 0.85), rgba(34, 42, 45, 0.72));
+    --notif-icon: light-dark(#F4F7F6, #121A1C);
+    --big-glow: light-dark(rgba(201, 119, 0, 0), rgba(255, 181, 71, 0.38));
+    --glow-wait: light-dark(rgba(201, 119, 0, 0.3), rgba(255, 181, 71, 0.5));
+    --glow-work: light-dark(rgba(15, 154, 137, 0.28), rgba(98, 227, 207, 0.5));
+    --glow-fault: light-dark(rgba(224, 72, 58, 0.3), rgba(255, 106, 92, 0.55));
+    --shadow: light-dark(rgba(30, 50, 55, 0.22), rgba(0, 0, 0, 0.55));
+    --f-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --f-dot: "Doto", "Martian Mono", ui-monospace, monospace;
+    --f-mono: "Martian Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; } }
+  :root[data-theme="dark"] { color-scheme: dark; }
+  :root[data-look="light"] { color-scheme: light; }
+  :root[data-look="dark"] { color-scheme: dark; }
+
+  html, body { background: var(--ground); }
+  body { color: var(--ink); font-family: var(--f-ui); -webkit-font-smoothing: antialiased; }
+  * { box-sizing: border-box; }
+  button, input { font: inherit; color: inherit; }
+
+  .page {
+    max-width: 1220px; margin: 0 auto;
+    padding-inline: 24px; padding-block: 44px 64px;
+    display: grid; gap: 32px 44px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "intro" "screen" "icon" "built";
+  }
+  @media (max-width: 520px) { .page { padding-inline: 16px; padding-block: 28px 44px; } }
+  @media (min-width: 1020px) {
+    .page {
+      grid-template-columns: 330px minmax(0, 1fr);
+      grid-template-rows: auto auto auto 1fr;
+      grid-template-areas: "intro screen" "icon screen" "built screen" ". screen";
+      align-items: start;
+    }
+  }
+  .intro { grid-area: intro; }
+  .icon-states { grid-area: icon; }
+  .built { grid-area: built; }
+  .screen { grid-area: screen; }
+
+  /* ——— Side column ——— */
+  .wordmark { font-family: var(--f-dot); font-weight: 900; font-size: clamp(44px, 7vw, 60px); line-height: 0.92; letter-spacing: 0.01em; margin: 0 0 16px; }
+  .lede { font-size: 16px; line-height: 1.5; color: var(--ink-2); margin: 0; max-width: 36ch; }
+  .lede b { color: var(--ink); font-weight: 600; }
+  .look { margin: 20px 0 0; padding: 0; border: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .look legend { float: left; margin-right: 4px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
+  .look .seg { display: inline-flex; padding: 2px; border-radius: 999px; background: var(--act-bg); }
+  .look input { position: absolute; opacity: 0; pointer-events: none; }
+  .look label { font-size: 12px; padding: 4px 11px; border-radius: 999px; cursor: pointer; color: var(--ink-2); }
+  .look input:checked + label { background: var(--glass-opaque); color: var(--ink); box-shadow: 0 1px 2px var(--shadow); }
+  .look input:focus-visible + label { outline: 2px solid var(--phosphor); outline-offset: 1px; }
+  .label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 12px; }
+  .specs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .spec { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 14px; align-items: center; }
+  .spec-bar {
+    height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: flex-end; padding-inline: 6px;
+    background: linear-gradient(180deg, var(--spec-top), var(--spec-bottom)); box-shadow: inset 0 0 0 1px var(--rule);
+  }
+  .spec > div:last-child > strong { display: block; font-size: 13px; font-weight: 600; }
+  .spec > div:last-child > span { display: block; font-size: 12px; line-height: 1.4; color: var(--ink-2); }
+
+  .notif {
+    margin-top: 22px; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 4px 10px;
+    align-items: center; padding: 11px 12px; border-radius: 16px;
+    background: var(--notif); box-shadow: inset 0 1px 0 var(--glass-hi), 0 0 0 1px var(--glass-edge), 0 18px 40px var(--shadow);
+  }
+  .notif-icon { grid-row: span 2; width: 30px; height: 30px; border-radius: 8px; background: var(--notif-icon); box-shadow: inset 0 0 0 1px var(--rule-strong); display: grid; place-items: center; }
+  .notif-icon .pips { transform: scale(1.25); }
+  .notif-top { font-size: 11px; color: var(--ink-3); display: flex; justify-content: space-between; gap: 8px; }
+  .notif-title { font-size: 13px; font-weight: 600; }
+  .notif-body { grid-column: 2 / 4; font-size: 12px; color: var(--ink-2); line-height: 1.4; }
+  .notif .act { grid-column: 3; grid-row: 1 / span 2; align-self: center; }
+
+  .built ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+  .built li { font-size: 13px; line-height: 1.5; color: var(--ink-2); padding-left: 14px; position: relative; }
+  .built li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 5px; height: 5px; border-radius: 50%; background: var(--ink-3); }
+  .built code { font-family: var(--f-mono); font-stretch: 85%; font-size: 11.5px; color: var(--ink); }
+  .foot { margin: 20px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--ink-3); max-width: 44ch; }
+
+  /* ——— The screen ——— */
+  .screen {
+    position: relative; border-radius: 16px; overflow: hidden; min-width: 0;
+    background:
+      radial-gradient(110% 70% at 8% 0%, var(--wall-a) 0%, transparent 55%),
+      radial-gradient(80% 60% at 100% 100%, var(--wall-b) 0%, transparent 62%),
+      radial-gradient(50% 45% at 55% 60%, var(--wall-c) 0%, transparent 70%),
+      linear-gradient(180deg, var(--wall-top) 0%, var(--wall-bottom) 100%);
+    box-shadow: 0 0 0 1px var(--rule), 0 40px 120px var(--shadow);
+  }
+  .screen::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.07; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' fill='%23ffffff'/%3E%3C/svg%3E");
+  }
+  .menubar {
+    position: relative; z-index: 2; height: 30px; display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding-inline: 14px; font-size: 13px; color: var(--menubar-ink);
+    background: var(--menubar-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  }
+  .mb-left { display: flex; gap: 18px; white-space: nowrap; overflow: hidden; }
+  .mb-left span:first-child { font-weight: 700; }
+  @media (max-width: 640px) { .mb-left span:nth-child(n+3) { display: none; } }
+  .mb-right { display: flex; align-items: center; gap: 12px; white-space: nowrap; }
+  .clock { font-variant-numeric: tabular-nums; }
+
+  /* ——— Menu bar glyph ——— */
+  .glyph {
+    display: inline-flex; align-items: center; justify-content: space-between; gap: 6px; height: 22px; width: 72px; padding-inline: 7px;
+    border: 0; border-radius: 6px; background: transparent; cursor: pointer;
+  }
+  .glyph[aria-expanded="true"] { background: var(--glyph-active); }
+  .glyph:focus-visible { outline: 2px solid var(--phosphor); outline-offset: 1px; }
+  .g-count { font-family: var(--f-dot); font-weight: 900; font-size: 17px; line-height: 1; color: var(--amber); min-width: 3ch; text-align: right; }
+  .g-count.fault { color: var(--fault); }
+  .pips { display: grid; grid-template-columns: repeat(3, 4px); gap: 2px; }
+  .p { width: 4px; height: 4px; border-radius: 50%; background: var(--dot-dim); }
+  .p.wait { background: var(--amber-dot); }
+  .p.work { background: var(--phosphor-dot); }
+  .p.fault { background: var(--fault-dot); }
+  /* Unseen attention episodes blink until the panel shows them; seen ones hold steady. */
+  .p.unseen { animation: runway 2.6s step-end infinite; }
+  .p.stale { opacity: 0.4; }
+  /* A source stopped reporting: the last slot becomes a dash. */
+  .p.dash { height: 2px; margin-top: 1px; border-radius: 1px; background: var(--dash); }
+  /* Differentiate Without Color: failure square, waiting circle, working ring. */
+  .pips.shapes .p.fault { border-radius: 0.5px; }
+  .pips.shapes .p.work { background: transparent; box-shadow: inset 0 0 0 1.2px var(--phosphor-dot); }
+  @keyframes runway { 0%, 50%, 100% { opacity: 1; } 68%, 86% { opacity: 0.22; } }
+
+  /* ——— Panel ——— */
+  .stage { position: relative; z-index: 1; display: flex; justify-content: flex-end; padding: 8px 10px 56px; min-height: 420px; }
+  @media (max-width: 520px) { .stage { padding: 8px 8px 32px; } }
+  .pop {
+    width: min(412px, 100%); border-radius: 20px; background: var(--glass);
+    backdrop-filter: blur(38px) saturate(170%); -webkit-backdrop-filter: blur(38px) saturate(170%);
+    box-shadow: inset 0 1px 0 var(--glass-hi), 0 0 0 1px var(--glass-edge), 0 30px 80px var(--shadow);
+  }
+  .pop-head { padding: 18px 18px 14px; display: grid; gap: 14px; }
+  .readout { display: flex; align-items: center; gap: 14px; }
+  .big { font-family: var(--f-dot); font-weight: 900; font-size: 64px; line-height: 0.8; color: var(--amber); text-shadow: 0 0 22px var(--big-glow); font-variant-numeric: tabular-nums; }
+  .readout div > strong { display: block; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+  .readout div > span { display: block; font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+  .sources { display: flex; flex-wrap: wrap; gap: 6px; }
+  .src { font-size: 11.5px; color: var(--ink-2); padding: 3px 9px; border-radius: 999px; background: var(--hover); box-shadow: inset 0 0 0 1px var(--rule); }
+  .src b { font-family: var(--f-mono); font-stretch: 80%; font-weight: 500; font-size: 11px; color: var(--ink); margin-right: 3px; }
+
+  .pop-body { padding: 0 6px 6px; }
+  .sec { padding-top: 6px; }
+  .sec + .sec { border-top: 1px solid var(--rule); margin-top: 6px; }
+  .sec-head { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 10px 4px; }
+  .sec-label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3); }
+  .sec-label.wait { color: var(--amber); }
+  .sec-label.work { color: var(--phosphor); }
+  .sec-count { font-family: var(--f-mono); font-stretch: 80%; font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .older { margin: 4px 0 8px; }
+  .older summary { cursor: pointer; padding: 10px; font-size: 12px; color: var(--amber); }
+  .older summary span { float: right; color: var(--ink-2); font-size: 11px; }
+
+  .rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+  .row { position: relative; display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; column-gap: 11px; padding: 9px 10px; border-radius: 12px; }
+  .row-hit { position: absolute; inset: 0; border: 0; border-radius: inherit; background: transparent; cursor: pointer; }
+  .row-hit:hover { background: var(--hover); }
+  .row-hit:focus-visible { outline: 2px solid var(--phosphor); outline-offset: -2px; }
+  .row.is-open .row-hit { background: var(--open-bg); box-shadow: inset 0 0 0 1px var(--open-edge); }
+  .row > :not(.row-hit) { position: relative; pointer-events: none; }
+  .row-more, .row-more * { pointer-events: auto; }
+
+  .pip { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; }
+  .pip.wait { background: var(--amber-dot); box-shadow: 0 0 9px var(--glow-wait); }
+  .pip.fault { background: var(--fault-dot); box-shadow: 0 0 9px var(--glow-fault); }
+  .pip.work { background: var(--phosphor-dot); box-shadow: 0 0 9px var(--glow-work); }
+  .pip.done { background: transparent; box-shadow: inset 0 0 0 1.5px var(--spent); }
+  .pip.idle { background: var(--dot-dim); }
+
+  .row-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 3px 7px; }
+  .name { font-size: 13.5px; font-weight: 600; letter-spacing: -0.005em; }
+  .tool, .tag { font-family: var(--f-mono); font-stretch: 80%; font-size: 9.5px; letter-spacing: 0.05em; text-transform: uppercase; padding: 1px 5px; border-radius: 4px; white-space: nowrap; }
+  .tool { box-shadow: inset 0 0 0 1px var(--rule-strong); }
+  .tool.cc { color: var(--claude); }
+  .tool.cx { color: var(--codex); }
+  .tag.fault { color: var(--fault); background: var(--tag-fault-bg); }
+  .tag.warn { color: var(--amber); background: var(--tag-warn-bg); }
+  .tag.here { color: var(--phosphor); background: var(--tag-here-bg); }
+  .tag.quiet { color: var(--ink-2); background: var(--tag-quiet-bg); }
+  .row-where { font-family: var(--f-mono); font-stretch: 85%; font-size: 10.5px; color: var(--ink-3); margin-top: 3px; overflow-wrap: anywhere; }
+  .row-where b { font-weight: 400; color: var(--ink-2); }
+  .row-msg { font-size: 12px; line-height: 1.42; color: var(--ink-2); margin: 5px 0 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .row.is-open .row-msg { display: block; -webkit-line-clamp: unset; }
+  .row-msg code { font-family: var(--f-mono); font-stretch: 85%; font-size: 10.5px; color: var(--ink); }
+  .asks { display: none; margin: 6px 0 0; padding-left: 18px; font-size: 12px; line-height: 1.42; color: var(--ink); }
+  .asks li + li { margin-top: 4px; }
+  .row.is-open .asks { display: block; }
+  .row-more { display: none; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .row.is-open .row-more { display: flex; }
+  .cmd { font-family: var(--f-mono); font-stretch: 80%; font-size: 10px; color: var(--ink-3); margin-left: 2px; }
+
+  .act { border: 0; cursor: pointer; font-size: 11.5px; font-weight: 500; padding: 4px 11px; border-radius: 999px; background: var(--act-bg); color: var(--ink); }
+  .act:hover { background: var(--act-hover); }
+  .act.primary { background: var(--act-primary); color: var(--act-primary-ink); }
+  .act.primary:hover { background: var(--act-primary-hover); }
+  .act:disabled { cursor: default; opacity: 0.6; }
+  .act:focus-visible { outline: 2px solid var(--phosphor); outline-offset: 2px; }
+
+  .row-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; padding-top: 2px; }
+  .age { font-family: var(--f-mono); font-stretch: 80%; font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .activity { display: block; width: 64px; height: 20px; }
+  .probe { display: none; }
+
+  .gap-note { margin: 4px 10px 8px; font-size: 11.5px; line-height: 1.4; color: var(--ink-3); }
+  .more { margin: 2px 10px 6px; border: 0; background: transparent; padding: 4px 0; cursor: pointer; font-size: 11.5px; color: var(--ink-2); }
+  .more:hover { color: var(--ink); }
+  .more:focus-visible { outline: 2px solid var(--phosphor); outline-offset: 2px; border-radius: 4px; }
+  .empty { margin: 8px 16px 12px; font-size: 12px; color: var(--ink-3); }
+
+  .pop-foot { display: flex; align-items: center; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid var(--rule); }
+  .jump { flex: 1; min-width: 0; border: 0; border-radius: 999px; padding: 7px 13px; font-size: 12.5px; background: var(--field); box-shadow: inset 0 0 0 1px var(--rule); }
+  .jump::placeholder { color: var(--ink-3); }
+  .jump:focus-visible { outline: 2px solid var(--phosphor); outline-offset: 1px; }
+  .kbd { font-family: var(--f-mono); font-stretch: 80%; font-size: 10px; color: var(--ink-2); white-space: nowrap; padding: 3px 7px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--rule-strong), inset 0 -1px 0 var(--rule-strong); }
+
+  @media (prefers-reduced-motion: reduce) { .p, .pip { animation: none !important; } }
+  @media (prefers-reduced-transparency: reduce) {
+    .pop, .menubar, .notif { background: var(--glass-opaque); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  }
+</style>
+
+<main class="page" id="agents-concept">
+  <section class="intro">
+    <h1 class="wordmark">Agents</h1>
+    <p class="lede">Every Claude Code and Codex session you run, in the menu bar. The icon tells you <b>whether anything needs you</b>; one click shows what it's waiting for.</p>
+    <fieldset class="look">
+      <legend>Appearance</legend>
+      <span class="seg">
+        <input type="radio" name="look" id="look-system" value="system" checked><label for="look-system">System</label>
+        <input type="radio" name="look" id="look-light" value="light"><label for="look-light">Light</label>
+        <input type="radio" name="look" id="look-dark" value="dark"><label for="look-dark">Dark instrument</label>
+      </span>
+    </fieldset>
+  </section>
+
+  <section class="screen" aria-label="Menu bar mockup">
+    <div class="menubar">
+      <div class="mb-left"><span>Ghostty</span><span>Shell</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span></div>
+      <div class="mb-right">
+        <button class="glyph" id="glyph" aria-expanded="true" aria-controls="tower" aria-label="Agents: 6 sessions need you, 1 failed, 3 working">
+          <span class="g-count">6</span>
+          <span class="pips" aria-hidden="true">
+            <i class="p fault"></i><i class="p wait"></i><i class="p wait"></i>
+            <i class="p wait"></i><i class="p wait"></i><i class="p wait"></i>
+            <i class="p work"></i><i class="p work"></i><i class="p work"></i>
+          </span>
+        </button>
+        <span class="clock">Thu Sep 10&nbsp;&nbsp;3:02 PM</span>
+      </div>
+    </div>
+
+    <div class="stage">
+      <section class="pop" id="tower" aria-label="Agents">
+        <header class="pop-head">
+          <div class="readout">
+            <span class="big">6</span>
+            <div><strong>need you</strong><span>6 older requests · newest first</span></div>
+          </div>
+          <div class="sources">
+            <span class="src"><b>14</b>This Mac</span>
+            <span class="src">Remote Control · no live coverage</span>
+            <span class="src">Cloud · no live coverage</span>
+          </div>
+        </header>
+
+        <div class="pop-body">
+          <div class="sec" data-sec>
+            <div class="sec-head"><span class="sec-label wait">Needs you</span><span class="sec-count">6</span></div>
+            <details class="older" id="older-requests" open>
+              <summary>Older requests <span>6 · over 7 days</span></summary>
+            <ul class="rows">
+              <li data-name="Update status badges web-app">
+                <div class="row">
+                  <button class="row-hit" aria-expanded="false" aria-label="Update status badges"></button>
+                  <span class="pip wait"></span>
+                  <div class="row-main">
+                    <div class="row-title"><span class="name">Update status badges</span><span class="tool cc">Claude</span></div>
+                    <div class="row-where"><b>web-app</b> · studio.local</div>
+                    <p class="row-msg">The status badge changes are ready. Which wording should the interface use?</p>
+                    <div class="row-more"><button class="act primary">Attach</button><button class="act">Transcript</button><span class="cmd">claude attach 00000000-0000-4000-8000-000000000001</span></div>
+                  </div>
+                  <div class="row-meta"><span class="age">13d wait</span></div>
+                </div>
+              </li>
+              <li data-name="Review mobile changes web-app">
+                <div class="row">
+                  <button class="row-hit" aria-expanded="false" aria-label="Review mobile changes"></button>
+                  <span class="pip wait"></span>
+                  <div class="row-main">
+                    <div class="row-title"><span class="name">Review mobile changes</span><span class="tool cc">Claude</span></div>
+                    <div class="row-where"><b>web-app</b> · PR #42 · studio.local</div>
+                    <p class="row-msg">The mobile changes are ready for review. The base branch has new commits.</p>
+                    <div class="row-more"><button class="act primary">Attach</button><button class="act">Open PR</button><span class="cmd">claude attach 00000000-0000-4000-8000-000000000002</span></div>
+                  </div>
+                  <div class="row-meta"><span class="age">15d wait</span></div>
+                </div>
+              </li>
+              <li data-name="Plan an integration integrations example-adapter cleanup">
+                <div class="row is-open">
+                  <button class="row-hit" aria-expanded="true" aria-label="Plan an integration"></button>
+                  <span class="pip wait"></span>
+                  <div class="row-main">
+                    <div class="row-title"><span class="name">Plan an integration</span><span class="tool cc">Claude</span><span class="tag warn">2 decisions</span></div>
+                    <div class="row-where"><b>integrations</b> · studio.local</div>
+                    <p class="row-msg">Two integration decisions need your input:</p>
+                    <ol class="asks">
+                      <li>Keep cleanup manual, or request approval when needed?</li>
+                      <li>Update the adapter now, or wait for the next upstream release?</li>
+                    </ol>
+                    <div class="row-more"><button class="act primary">Attach</button><button class="act">Transcript</button><span class="cmd">claude attach 00000000-0000-4000-8000-000000000003</span></div>
+                  </div>
+                  <div class="row-meta"><span class="age">17d wait</span></div>
+                </div>
+              </li>
+              <li data-name="Investigate a failed turn integrations model refusal failure">
+                <div class="row">
+                  <button class="row-hit" aria-expanded="false" aria-label="Investigate a failed turn"></button>
+                  <span class="pip fault"></span>
+                  <div class="row-main">
+                    <div class="row-title"><span class="name">Investigate a failed turn</span><span class="tool cc">Claude</span><span class="tag fault">Model refusal</span></div>
+                    <div class="row-where"><b>integrations</b> · studio.local</div>
+                    <p class="row-msg">The last turn failed and needs your attention.</p>
+                    <div class="row-more"><button class="act primary">Attach</button><button class="act">Transcript</button><span class="cmd">claude attach 00000000-0000-4000-8000-000000000004</span></div>
+                  </div>
+                  <div class="row-meta"><span class="age">21d wait</span></div>
+                </div>
+              </li>
+              <li data-name="Import saved boards sample-apps">
+                <div class="row">
+                  <button class="row-hit" aria-expanded="false" aria-label="Import saved boards"></button>
+                  <span class="pip wait"></span>
+                  <div class="row-main">
+                    <div class="row-title"><span class="name">Import saved boards</span><span class="tool cc">Claude</span></div>
+                    <div class="row-where"><b>sample-apps</b> · studio.local</div>
+                    <p class="row-msg">Three import approaches are ready for comparison.</p>
+                    <div class="row-more"><button class="act primary">Attach</button><button class="act">Transcript</button><span class="cmd">claude attach 00000000-0000-4000-8000-000000000005</span></div>
+                  </div>
+                  <div class="row-meta"><span class="age">24d wait</span></div>
+                </div>
+              </li>
+              <li data-name="Review game changes sample-game">
+                <div class="row">
+                  <button class="row-hit" aria-expanded="false" aria-label="Review game changes"></button>
+                  <span class="pip wait"></span>
+                  <div class="row-main">
+                    <div class="row-title"><span class="name">Review game changes</span><span class="tool cc">Claude</span></div>
+                    <div class="row-where"><b>sample-game</b> · studio.local</div>
+                    <p class="row-msg">The changes are ready. Choose which pull request to submit.</p>
+                    <div class="row-more"><button class="act primary">Attach</button><button class="act">Transcript</button><span class="cmd">claude attach 00000000-0000-4000-8000-000000000006</span></div>
+                  </div>
+                  <div class="row-meta"><span class="age">27d wait</span></div>
+                </div>
+              </li>
+            </ul>
+            </details>
+          </div>
+
+          <div class="sec" data-sec>
+            <div class="sec-head"><span class="sec-label work">Working</span><span class="sec-count">3</span></div>
+            <ul class="rows">
+              <li data-name="Refine the editor image-editor editor-polish quiet">
+                <div class="row">
+                  <button class="row-hit" aria-expanded="false" aria-label="Refine the editor"></button>
+                  <span class="pip work"></span>
+                  <div class="row-main">
+                    <div class="row-title"><span class="name">Refine the editor</span><span class="tool cc">Claude</span><span class="tag quiet">quiet 26m</span></div>
+                    <div class="row-where"><b>image-editor</b> · editor-polish · studio.local</div>
+                    <p class="row-msg">The editor layout has been updated. Reviewing the remaining visual details.</p>
+                    <div class="row-more"><button class="act primary">Attach</button><button class="act">Transcript</button><span class="cmd">claude attach 00000000-0000-4000-8000-000000000007</span></div>
+                  </div>
+                  <div class="row-meta">
+                    <canvas class="activity" role="img" aria-label="No output in the last 15 minutes; quiet for 26 minutes"
+                      data-tpm="[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]"
+                      data-tool="[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]" data-start="0"></canvas>
+                    <span class="age">active 26m ago</span>
+                  </div>
+                </div>
+              </li>
+              <li data-name="design an agent dashboard codex agent-dashboard">
+                <div class="row">
+                  <button class="row-hit" aria-expanded="false" aria-label="Design an agent dashboard"></button>
+                  <span class="pip work"></span>
+                  <div class="row-main">
+                    <div class="row-title"><span class="name">Design an agent dashboard</span><span class="tool cx">Codex</span></div>
+                    <div class="row-where"><b>agent-dashboard</b> · CLI · studio.local</div>
+                    <p class="row-msg">Collecting activity from the current turn.</p>
+                    <div class="row-more"><button class="act primary" disabled>Open source</button><button class="act">Transcript</button><span class="cmd">Source link unavailable in preview</span></div>
+                  </div>
+                  <div class="row-meta">
+                    <canvas class="activity" role="img" aria-label="1,444 output tokens since the thread started at 2:59 PM"
+                      data-tpm="[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,522,1348,0,1018,0]"
+                      data-tool="[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0]" data-start="24"></canvas>
+                    <span class="age">active now</span>
+                  </div>
+                </div>
+              </li>
+              <li data-name="Build the dashboard this session">
+                <div class="row">
+                  <button class="row-hit" aria-expanded="false" aria-label="Build the dashboard"></button>
+                  <span class="pip work"></span>
+                  <div class="row-main">
+                    <div class="row-title"><span class="name">Build the dashboard</span><span class="tool cc">Claude</span><span class="tag here">this session</span></div>
+                    <div class="row-where"><b>agent-dashboard</b> · studio.local</div>
+                    <p class="row-msg">Building the menu bar panel.</p>
+                  </div>
+                  <div class="row-meta">
+                    <canvas class="activity" role="img" aria-label="11,787 output tokens in the last 15 minutes, in three bursts; tools ran for 3 minutes"
+                      data-tpm="[0,0,0,0,0,0,0,0,0,0,0,0,2892,702,5780,0,0,0,0,0,1316,1300,376,6776,0,0,0,0,4432,0]"
+                      data-tool="[0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,1,0,0,0,0,0,1,0]" data-start="0"></canvas>
+                    <span class="age">active now</span>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <div class="sec" data-sec>
+            <div class="sec-head"><span class="sec-label">Ready to review</span><span class="sec-count">4</span></div>
+            <ul class="rows">
+              <li data-name="Inventory example apps sample-apps">
+                <div class="row">
+                  <button class="row-hit" aria-expanded="false" aria-label="Inventory example apps"></button>
+                  <span class="pip done"></span>
+                  <div class="row-main">
+                    <div class="row-title"><span class="name">Inventory example apps</span><span class="tool cc">Claude</span></div>
+                    <div class="row-where"><b>sample-apps</b> · studio.local</div>
+                  </div>
+                  <div class="row-meta"><span class="age">done 3h ago</span></div>
+                </div>
+              </li>
+              <li data-name="Check the extension web-app extension-tests">
+                <div class="row">
+                  <button class="row-hit" aria-expanded="false" aria-label="Check the extension"></button>
+                  <span class="pip done"></span>
+                  <div class="row-main">
+                    <div class="row-title"><span class="name">Check the extension</span><span class="tool cc">Claude</span></div>
+                    <div class="row-where"><b>web-app</b> · extension-tests · studio.local</div>
+                    <p class="row-msg">The extension checks finished. One follow-up remains.</p>
+                  </div>
+                  <div class="row-meta"><span class="age">done 20h ago</span></div>
+                </div>
+              </li>
+              <li class="extra" hidden data-name="Clean up test processes sample-game">
+                <div class="row">
+                  <button class="row-hit" aria-expanded="false" aria-label="Clean up test processes"></button>
+                  <span class="pip done"></span>
+                  <div class="row-main">
+                    <div class="row-title"><span class="name">Clean up test processes</span><span class="tool cc">Claude</span></div>
+                    <div class="row-where"><b>sample-game</b> · studio.local</div>
+                  </div>
+                  <div class="row-meta"><span class="age">done 1d ago</span></div>
+                </div>
+              </li>
+              <li class="extra" hidden data-name="Write a product description sample-apps">
+                <div class="row">
+                  <button class="row-hit" aria-expanded="false" aria-label="Write a product description"></button>
+                  <span class="pip done"></span>
+                  <div class="row-main">
+                    <div class="row-title"><span class="name">Write a product description</span><span class="tool cc">Claude</span></div>
+                    <div class="row-where"><b>sample-apps</b> · studio.local</div>
+                  </div>
+                  <div class="row-meta"><span class="age">done 1d ago</span></div>
+                </div>
+              </li>
+            </ul>
+            <button class="more" id="more" aria-expanded="false">Show 2 more</button>
+          </div>
+
+          <div class="sec" data-sec>
+            <div class="sec-head"><span class="sec-label">Idle and disconnected</span><span class="sec-count">2</span></div>
+            <ul class="rows">
+              <li data-name="Explore a prototype prototype idle">
+                <div class="row">
+                  <button class="row-hit" aria-expanded="false" aria-label="Explore a prototype"></button>
+                  <span class="pip idle"></span>
+                  <div class="row-main">
+                    <div class="row-title"><span class="name">Explore a prototype</span><span class="tool cc">Claude</span></div>
+                    <div class="row-where"><b>prototype</b> · interactive · studio.local</div>
+                  </div>
+                  <div class="row-meta"><span class="age">idle</span></div>
+                </div>
+              </li>
+              <li data-name="Review a library library idle">
+                <div class="row">
+                  <button class="row-hit" aria-expanded="false" aria-label="Review a library"></button>
+                  <span class="pip idle"></span>
+                  <div class="row-main">
+                    <div class="row-title"><span class="name">Review a library</span><span class="tool cc">Claude</span></div>
+                    <div class="row-where"><b>library</b> · interactive · studio.local</div>
+                  </div>
+                  <div class="row-meta"><span class="age">idle</span></div>
+                </div>
+              </li>
+            </ul>
+            <p class="gap-note" data-name="remote control cloud coverage not covered">Remote Control and Claude cloud sessions aren't shown: there's no supported way to list them yet.</p>
+          </div>
+          <p class="empty" id="empty" hidden></p>
+        </div>
+
+        <footer class="pop-foot">
+          <input class="jump" id="jump" type="search" placeholder="Jump to session" aria-label="Jump to session" autocomplete="off">
+          <span class="kbd">⌥ Space</span>
+        </footer>
+      </section>
+    </div>
+  </section>
+
+  <section class="icon-states">
+    <h2 class="label">The menu bar icon</h2>
+    <ul class="specs">
+      <li class="spec">
+        <div class="spec-bar"><span class="glyph" aria-hidden="true"><span class="g-count"></span><span class="pips"><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i></span></span></div>
+        <div><strong>Quiet</strong><span>Dim dots and no count: nothing working or waiting.</span></div>
+      </li>
+      <li class="spec">
+        <div class="spec-bar"><span class="glyph" aria-hidden="true"><span class="g-count"></span><span class="pips"><i class="p work"></i><i class="p work"></i><i class="p work"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i></span></span></div>
+        <div><strong>Working</strong><span>One steady cyan dot per working session.</span></div>
+      </li>
+      <li class="spec">
+        <div class="spec-bar"><span class="glyph" aria-hidden="true"><span class="g-count">2</span><span class="pips"><i class="p wait unseen"></i><i class="p wait"></i><i class="p work"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i></span></span></div>
+        <div><strong>Needs you</strong><span>Amber dots. A new request blinks until the panel has shown it, then holds steady.</span></div>
+      </li>
+      <li class="spec">
+        <div class="spec-bar"><span class="glyph" aria-hidden="true"><span class="g-count fault">1</span><span class="pips"><i class="p fault unseen"></i><i class="p work"></i><i class="p work"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i></span></span></div>
+        <div><strong>Needs intervention</strong><span>A red dot. The count turns red until you've seen the failure.</span></div>
+      </li>
+      <li class="spec">
+        <div class="spec-bar"><span class="glyph" aria-hidden="true"><span class="g-count">6</span><span class="pips"><i class="p fault"></i><i class="p wait"></i><i class="p wait stale"></i><i class="p wait"></i><i class="p wait"></i><i class="p wait"></i><i class="p work"></i><i class="p work stale"></i><i class="p dash"></i></span></span></div>
+        <div><strong>Incomplete coverage</strong><span>A dash in the last slot; sessions on silent sources dim. Offline doesn't mean finished.</span></div>
+      </li>
+      <li class="spec">
+        <div class="spec-bar"><span class="glyph" aria-hidden="true"><span class="g-count">2</span><span class="pips shapes"><i class="p fault"></i><i class="p wait"></i><i class="p work"></i><i class="p work"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i></span></span></div>
+        <div><strong>Without color</strong><span>With Differentiate Without Color on: failure square, waiting circle, working ring.</span></div>
+      </li>
+    </ul>
+
+    <div class="notif" role="img" aria-label="Example notification">
+      <span class="notif-icon"><span class="pips" aria-hidden="true"><i class="p wait"></i><i class="p wait"></i><i class="p work"></i><i class="p"></i><i class="p"></i><i class="p"></i></span></span>
+      <div class="notif-top"><span>Agents</span><span>now</span></div>
+      <div class="notif-title">Plan an integration needs a decision</div>
+      <button class="act primary" tabindex="-1">Attach</button>
+      <div class="notif-body">Which integration approach should we use?</div>
+    </div>
+  </section>
+
+  <section class="built">
+    <h2 class="label">Under the hood</h2>
+    <ul>
+      <li>A native SwiftUI panel. The icon is a non-template image: colors were tested on this Mac's menu bar, and blinking is limited to unseen requests to stay within the CPU budget.</li>
+      <li>Activity lines plot output tokens per minute over 15 minutes from transcript and rollout token counts. Dotted baseline: a tool was running. Flat: nothing produced.</li>
+      <li>Claude inventory uses <code>claude agents --json</code>, transcripts and hooks. Test Codex's shared App Server before its file fallback.</li>
+      <li>Remote sessions use a hub; unavailable sources stay visibly unavailable.</li>
+      <li><code>⌥ Space</code> opens the panel from anywhere. Arrow keys move between sessions; Return expands one.</li>
+    </ul>
+    <p class="foot">Mockup, not live monitoring. Names, messages, identifiers, projects, and machines are sample data. Activity lines retain measured, anonymous token counts from a development spike. Individual wait ages are illustrative to demonstrate newest-first ordering within the reported 13–27 day range. Session actions do not execute.</p>
+  </section>
+  <span class="probe" id="probe"></span>
+</main>
+
+<script>
+  (() => {
+    const root = document.getElementById('agents-concept');
+    const pop = root.querySelector('#tower');
+    const glyph = root.querySelector('#glyph');
+
+    const setOpen = (open) => {
+      pop.hidden = !open;
+      glyph.setAttribute('aria-expanded', String(open));
+    };
+    glyph.addEventListener('click', () => setOpen(pop.hidden));
+    root.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { setOpen(false); glyph.focus(); }
+      if (e.altKey && e.code === 'Space') {
+        e.preventDefault();
+        setOpen(pop.hidden);
+        if (!pop.hidden) root.querySelector('#jump').focus();
+      }
+    });
+
+    pop.querySelectorAll('.row-hit').forEach((hit) => {
+      hit.addEventListener('click', () => {
+        const row = hit.closest('.row');
+        const open = !row.classList.contains('is-open');
+        row.classList.toggle('is-open', open);
+        hit.setAttribute('aria-expanded', String(open));
+      });
+    });
+
+    pop.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      const hits = [...pop.querySelectorAll('.row-hit')].filter((h) => h.offsetParent !== null);
+      const i = hits.indexOf(document.activeElement);
+      if (i < 0) return;
+      e.preventDefault();
+      hits[Math.max(0, Math.min(hits.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))].focus();
+    });
+
+    const more = root.querySelector('#more');
+    more.addEventListener('click', () => {
+      const showing = more.getAttribute('aria-expanded') === 'true';
+      pop.querySelectorAll('li.extra').forEach((li) => { li.hidden = showing; });
+      more.setAttribute('aria-expanded', String(!showing));
+      more.textContent = showing ? 'Show 2 more' : 'Show fewer';
+    });
+
+    const jump = root.querySelector('#jump');
+    const empty = root.querySelector('#empty');
+    const older = root.querySelector('#older-requests');
+    let searching = false, olderWasOpen = older.open;
+    jump.addEventListener('input', () => {
+      const q = jump.value.trim().toLowerCase();
+      if (q && !searching) olderWasOpen = older.open;
+      older.open = q ? true : olderWasOpen;
+      searching = !!q;
+      let any = false;
+      pop.querySelectorAll('[data-sec]').forEach((sec) => {
+        let secAny = false;
+        sec.querySelectorAll('[data-name]').forEach((el) => {
+          const match = !q || el.dataset.name.toLowerCase().includes(q);
+          if (el.classList.contains('extra')) {
+            el.hidden = q ? !match : more.getAttribute('aria-expanded') !== 'true';
+          } else {
+            el.hidden = !match;
+          }
+          if (match) secAny = true;
+        });
+        sec.hidden = !secAny;
+        more.hidden = !!q;
+        if (secAny) any = true;
+      });
+      empty.hidden = any;
+      empty.textContent = any ? '' : `No sessions match “${jump.value.trim()}”.`;
+    });
+
+    // Activity lines: measured output tokens per minute in 30-second buckets; dotted baseline where a tool was running.
+    const probe = root.querySelector('#probe');
+    const resolve = (token) => { probe.style.color = `var(${token})`; return getComputedStyle(probe).color; };
+    const drawActivity = (canvas) => {
+      const tpm = JSON.parse(canvas.dataset.tpm);
+      const tool = JSON.parse(canvas.dataset.tool);
+      const start = Number(canvas.dataset.start) || 0;
+      const w = 64, h = 20, dpr = window.devicePixelRatio || 1;
+      canvas.width = w * dpr; canvas.height = h * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      const n = tpm.length;
+      const step = (w - 4) / (n - 1);
+      const peak = Math.max(1000, ...tpm);
+      const base = h - 3;
+      const x = (i) => 2 + i * step;
+      const y = (v) => base - (v / peak) * (h - 6);
+      const line = resolve('--phosphor-dot');
+
+      ctx.save();
+      ctx.strokeStyle = resolve('--spent');
+      ctx.lineWidth = 1;
+      ctx.setLineDash([1.5, 2]);
+      for (let i = start; i < n; i++) {
+        if (!tool[i]) continue;
+        ctx.beginPath();
+        ctx.moveTo(Math.max(1, x(i) - step / 2), h - 0.75);
+        ctx.lineTo(Math.min(w - 1, x(i) + step / 2), h - 0.75);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.beginPath();
+      ctx.moveTo(x(start), base);
+      for (let i = start; i < n; i++) ctx.lineTo(x(i), y(tpm[i]));
+      ctx.lineTo(x(n - 1), base);
+      ctx.closePath();
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = line;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      ctx.beginPath();
+      for (let i = start; i < n; i++) (i === start ? ctx.moveTo : ctx.lineTo).call(ctx, x(i), y(tpm[i]));
+      ctx.strokeStyle = line;
+      ctx.lineWidth = 1.3;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(x(n - 1), y(tpm[n - 1]), 1.8, 0, Math.PI * 2);
+      ctx.fillStyle = line;
+      ctx.fill();
+    };
+    const drawAll = () => root.querySelectorAll('canvas.activity').forEach(drawActivity);
+    drawAll();
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', drawAll);
+    new MutationObserver(drawAll).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-look'] });
+
+    // Appearance preview: System follows the viewer; Light and Dark instrument override it.
+    const applyLook = (value) => {
+      if (value === 'system') delete document.documentElement.dataset.look;
+      else document.documentElement.dataset.look = value;
+    };
+    root.querySelectorAll('input[name="look"]').forEach((input) => {
+      input.addEventListener('change', () => {
+        applyLook(input.value);
+        try { localStorage.setItem('agents-look', input.value); } catch (e) {}
+      });
+    });
+    try {
+      const saved = localStorage.getItem('agents-look');
+      const input = saved && root.querySelector(`input[name="look"][value="${saved}"]`);
+      if (input) { input.checked = true; applyLook(saved); }
+    } catch (e) {}
+  })();
+</script>

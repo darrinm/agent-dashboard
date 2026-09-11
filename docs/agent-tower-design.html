@@ -1,0 +1,618 @@
+<title>Agent Tower Design Doc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Doto:wght@900&family=Martian+Mono:wdth,wght@75..112.5,300..600&family=Schibsted+Grotesk:ital,wght@0,400;0,500;0,700;1,400&display=swap">
+<style>
+  :root {
+    --ground: #F4F7F6;
+    --surface: #FFFFFF;
+    --ink: #132022;
+    --ink-2: #465755;
+    --ink-3: #6F7F7C;
+    --rule: #D9E1DE;
+    --rule-soft: #E7EDEB;
+    --accent: #0C7366;
+    --amber: #9E5E00;
+    --amber-bg: #FFF0D6;
+    --fault: #B93826;
+    --fault-bg: #FCE6E1;
+    --work: #0C7366;
+    --work-bg: #DBF3EE;
+    --code-bg: #ECF1EF;
+    --dot-dim: #B4C0BD;
+    --f-body: "Schibsted Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --f-mono: "Martian Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --f-dot: "Doto", "Martian Mono", ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0C1113;
+      --surface: #131A1C;
+      --ink: #E4EAE7;
+      --ink-2: #A2AFAB;
+      --ink-3: #72807C;
+      --rule: #253134;
+      --rule-soft: #1A2427;
+      --accent: #62E3CF;
+      --amber: #FFB547;
+      --amber-bg: rgba(255, 181, 71, 0.13);
+      --fault: #FF7A6B;
+      --fault-bg: rgba(255, 106, 92, 0.13);
+      --work: #62E3CF;
+      --work-bg: rgba(98, 227, 207, 0.11);
+      --code-bg: #162023;
+      --dot-dim: #3A4846;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0C1113;
+    --surface: #131A1C;
+    --ink: #E4EAE7;
+    --ink-2: #A2AFAB;
+    --ink-3: #72807C;
+    --rule: #253134;
+    --rule-soft: #1A2427;
+    --accent: #62E3CF;
+    --amber: #FFB547;
+    --amber-bg: rgba(255, 181, 71, 0.13);
+    --fault: #FF7A6B;
+    --fault-bg: rgba(255, 106, 92, 0.13);
+    --work: #62E3CF;
+    --work-bg: rgba(98, 227, 207, 0.11);
+    --code-bg: #162023;
+    --dot-dim: #3A4846;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; } }
+  :root[data-theme="dark"] { color-scheme: dark; }
+
+  * { box-sizing: border-box; }
+  html, body { background: var(--ground); }
+  body { color: var(--ink); font-family: var(--f-body); font-size: 16.5px; line-height: 1.62; -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+  code { font-family: var(--f-mono); font-stretch: 88%; font-size: 0.8em; background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+  strong { font-weight: 700; }
+
+  .wrap { max-width: 1160px; margin: 0 auto; padding-inline: 28px; padding-block: 56px 96px; }
+  @media (max-width: 560px) { .wrap { padding-inline: 18px; padding-block: 32px 64px; } body { font-size: 16px; } }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 48px; }
+  @media (min-width: 1080px) { .layout { grid-template-columns: 210px minmax(0, 740px); gap: 72px; } }
+
+  /* Header */
+  .masthead { margin-bottom: 56px; }
+  @media (min-width: 1080px) { .masthead { margin-left: calc(210px + 72px); max-width: 740px; } }
+  .eyebrow { font-family: var(--f-mono); font-stretch: 85%; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 18px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+  .status { color: var(--amber); }
+  .superseded { margin: 0 0 28px; padding: 14px 16px; border-radius: 12px; background: var(--amber-bg); color: var(--ink); font-size: 15px; line-height: 1.55; max-width: none; }
+  .superseded p { margin: 0 0 8px; max-width: 68ch; }
+  .superseded p:last-child { margin-bottom: 0; }
+  h1 { font-family: var(--f-dot); font-weight: 900; font-size: clamp(44px, 8vw, 68px); line-height: 0.9; letter-spacing: 0.005em; margin: 0 0 22px; }
+  .dek { font-size: clamp(18px, 2.4vw, 21px); line-height: 1.45; color: var(--ink-2); margin: 0 0 28px; max-width: 50ch; text-wrap: pretty; }
+  .meta { display: flex; flex-wrap: wrap; gap: 10px 32px; margin: 0; padding-top: 20px; border-top: 1px solid var(--rule); }
+  .meta div { display: grid; gap: 2px; }
+  .meta dt { font-family: var(--f-mono); font-stretch: 85%; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  .meta dd { margin: 0; font-size: 14.5px; }
+
+  /* TOC */
+  .toc { display: none; }
+  @media (min-width: 1080px) {
+    .toc { display: block; position: sticky; top: 32px; align-self: start; max-height: calc(100vh - 64px); overflow-y: auto; }
+  }
+  .toc p { font-family: var(--f-mono); font-stretch: 85%; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 12px; }
+  .toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .toc a { display: grid; grid-template-columns: 26px 1fr; font-size: 13.5px; line-height: 1.35; color: var(--ink-2); text-decoration: none; padding: 5px 0; }
+  .toc a span { font-family: var(--f-mono); font-stretch: 80%; font-size: 11px; color: var(--ink-3); padding-top: 1px; }
+  .toc a:hover, .toc a.on { color: var(--ink); }
+  .toc a.on span { color: var(--accent); }
+
+  /* Body */
+  main { min-width: 0; }
+  section { scroll-margin-top: 24px; }
+  section + section { margin-top: 64px; padding-top: 8px; }
+  h2 { font-size: 27px; line-height: 1.2; letter-spacing: -0.015em; font-weight: 700; margin: 0 0 18px; text-wrap: balance; display: flex; gap: 14px; align-items: baseline; }
+  h2 .n { font-family: var(--f-mono); font-stretch: 80%; font-size: 13px; font-weight: 400; color: var(--ink-3); letter-spacing: 0; flex: none; }
+  h3 { font-size: 17.5px; line-height: 1.3; font-weight: 700; margin: 34px 0 10px; text-wrap: balance; }
+  p { margin: 0 0 14px; max-width: 68ch; }
+  main ul, main ol.plain { margin: 0 0 16px; padding-left: 20px; max-width: 68ch; }
+  main li { margin: 0 0 7px; }
+  main li::marker { color: var(--ink-3); }
+  .lead { font-size: 18px; line-height: 1.55; }
+
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; margin: 22px 0 22px; background: var(--rule); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+  .fact { background: var(--surface); padding: 14px 16px; }
+  .fact b { display: block; font-family: var(--f-mono); font-stretch: 85%; font-weight: 500; font-size: 22px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .fact b.warn { color: var(--amber); }
+  .fact span { display: block; font-size: 13px; line-height: 1.35; color: var(--ink-2); margin-top: 4px; }
+
+  .decision { margin: 22px 0; padding: 16px 18px; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; }
+  .decision .k { font-family: var(--f-mono); font-stretch: 85%; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin: 0 0 6px; }
+  .decision p { margin: 0 0 8px; }
+  .decision p:last-child { margin-bottom: 0; }
+  .decision .choice { font-weight: 700; }
+
+  .table-wrap { overflow-x: auto; margin: 18px 0 22px; border: 1px solid var(--rule); border-radius: 12px; background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.45; }
+  th { text-align: left; font-family: var(--f-mono); font-stretch: 85%; font-weight: 500; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); padding: 11px 14px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+  td { padding: 11px 14px; vertical-align: top; border-top: 1px solid var(--rule-soft); }
+  tr:first-child td { border-top: 0; }
+  td:first-child { font-weight: 500; }
+  table.wide { min-width: 680px; }
+  .muted { color: var(--ink-3); }
+
+  pre.code { margin: 18px 0 22px; padding: 16px 18px; background: var(--code-bg); border-radius: 12px; overflow-x: auto; font-family: var(--f-mono); font-stretch: 88%; font-size: 12.5px; line-height: 1.65; color: var(--ink); }
+  pre.code .c { color: var(--ink-3); }
+  pre.mermaid { margin: 18px 0 22px; padding: 18px; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; overflow-x: auto; text-align: center; }
+
+  .chip { display: inline-block; font-family: var(--f-mono); font-stretch: 82%; font-size: 11px; font-weight: 500; letter-spacing: 0.02em; padding: 1px 7px; border-radius: 999px; white-space: nowrap; background: var(--code-bg); color: var(--ink-2); }
+  .chip.working { background: var(--work-bg); color: var(--work); }
+  .chip.waiting { background: var(--amber-bg); color: var(--amber); }
+  .chip.error { background: var(--fault-bg); color: var(--fault); }
+
+  .glyph { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 7px; background: var(--code-bg); vertical-align: middle; }
+  .g-count { font-family: var(--f-dot); font-weight: 900; font-size: 17px; line-height: 1; color: var(--amber); }
+  .g-count.fault { color: var(--fault); }
+  .pips { display: grid; grid-template-columns: repeat(3, 4px); gap: 2px; }
+  .p { width: 4px; height: 4px; border-radius: 50%; background: var(--dot-dim); }
+  .p.wait { background: var(--amber); }
+  .p.work { background: var(--work); }
+  .p.fault { background: var(--fault); }
+
+  .qs { counter-reset: q; list-style: none; padding: 0 !important; }
+  .qs li { counter-increment: q; display: grid; grid-template-columns: 34px 1fr; margin-bottom: 12px; }
+  .qs li::before { content: "Q" counter(q); font-family: var(--f-mono); font-stretch: 80%; font-size: 11.5px; color: var(--ink-3); padding-top: 3px; }
+
+  .milestones { list-style: none; padding: 0 !important; margin: 18px 0 0 !important; display: grid; gap: 0; border-left: 1px solid var(--rule); }
+  .milestones li { position: relative; padding: 0 0 26px 26px; margin: 0; }
+  .milestones li::before { content: ""; position: absolute; left: -5px; top: 7px; width: 9px; height: 9px; border-radius: 50%; background: var(--ground); box-shadow: inset 0 0 0 2px var(--accent); }
+  .milestones li:first-child::before { background: var(--accent); }
+  .milestones h3 { margin: 0 0 4px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+  .milestones h3 .m { font-family: var(--f-mono); font-stretch: 80%; font-size: 12px; font-weight: 500; color: var(--accent); }
+  .milestones h3 .d { font-family: var(--f-mono); font-stretch: 80%; font-size: 11px; font-weight: 400; color: var(--ink-3); }
+  .milestones p { margin: 0 0 6px; }
+  .exit { font-size: 14.5px; color: var(--ink-2); }
+  .exit b { font-weight: 500; color: var(--ink); }
+
+  footer.end { margin-top: 72px; padding-top: 18px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--ink-3); max-width: 68ch; }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow"><span>Design exploration</span><span class="status">Consolidated into DESIGN.md</span><span>Sep 10, 2026</span></p>
+    <div class="superseded" role="note">
+      <p><strong>Superseded.</strong> The product is now named <strong>Agents</strong>, and its canonical design is <code>DESIGN.md</code> in <code>~/src/agent-dashboard</code>. It incorporates this document's local findings and the review. Where the two disagree, DESIGN.md wins; this page is kept as history. Session names and identifiers have been anonymized for publication.</p>
+      <p>Replaced here: the Bun collector (now Go), AppKit instead of <code>MenuBarExtra</code> (prototype <code>MenuBarExtra</code> first), the single state list (separate state dimensions), always-animating icon dots (blink only for unseen requests), “Stop all” (review older requests instead), <code>codex resume</code> as “open,” collision warnings in v1, and accuracy work after the first release (now part of it).</p>
+    </div>
+    <h1>Agent Tower</h1>
+    <p class="dek">A macOS menu bar app that shows every Claude Code and Codex session you run, on this Mac, on other machines and in the cloud, and tells you which ones are waiting on you.</p>
+    <dl class="meta">
+      <div><dt>Owner</dt><dd>Darrin</dd></div>
+      <div><dt>Repo</dt><dd><code>~/src/agent-dashboard</code></dd></div>
+      <div><dt>Mockup</dt><dd><a href="../mockups/agent-tower.html" target="_blank" rel="noopener">Agent Tower panel</a></dd></div>
+    </dl>
+  </header>
+
+  <div class="layout">
+    <nav class="toc" aria-label="Contents">
+      <p>Contents</p>
+      <ol>
+        <li><a href="#summary"><span>1</span>Summary</a></li>
+        <li><a href="#problem"><span>2</span>Problem</a></li>
+        <li><a href="#goals"><span>3</span>Goals and non-goals</a></li>
+        <li><a href="#experience"><span>4</span>Experience</a></li>
+        <li><a href="#architecture"><span>5</span>Architecture</a></li>
+        <li><a href="#sources"><span>6</span>Data sources</a></li>
+        <li><a href="#model"><span>7</span>Session model</a></li>
+        <li><a href="#state"><span>8</span>State engine</a></li>
+        <li><a href="#collector"><span>9</span>Collector</a></li>
+        <li><a href="#app"><span>10</span>Menu bar app</a></li>
+        <li><a href="#hooks"><span>11</span>Hooks and notify</a></li>
+        <li><a href="#collisions"><span>12</span>Collisions</a></li>
+        <li><a href="#remote"><span>13</span>Other machines and cloud</a></li>
+        <li><a href="#privacy"><span>14</span>Privacy and security</a></li>
+        <li><a href="#risks"><span>15</span>Risks</a></li>
+        <li><a href="#milestones"><span>16</span>Milestones</a></li>
+        <li><a href="#questions"><span>17</span>Open questions</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <section id="summary">
+        <h2><span class="n">§1</span>Summary</h2>
+        <p class="lead">Agent sessions now outnumber the places you look for them. They're spread across Ghostty tabs, background Claude sessions, Codex Desktop, VS Code and claude.ai, and none of those surfaces tell you when an agent stops and waits for you. Work stalls silently.</p>
+        <p>Agent Tower has two parts. A <strong>collector</strong> reads what Claude Code and Codex already write to disk and turns it into one list of sessions, each with a state you can trust. A native <strong>menu bar app</strong> shows that list, notifies you when something needs you, and takes you straight into the session. A <strong>hub</strong>, added later, brings in sessions from other machines and the cloud.</p>
+        <p>Nothing here requires changes to either tool. Every signal used below was confirmed on this Mac on Sep 10, 2026, except where §17 lists it as open.</p>
+      </section>
+
+      <section id="problem">
+        <h2><span class="n">§2</span>Problem</h2>
+        <p>A snapshot of this Mac at 3:02 PM on Sep 10:</p>
+        <div class="facts">
+          <div class="fact"><b>13</b><span>Claude Code sessions on this Mac</span></div>
+          <div class="fact"><b class="warn">6</b><span>blocked, waiting for input</span></div>
+          <div class="fact"><b class="warn">100+</b><span>session-days spent waiting, combined</span></div>
+          <div class="fact"><b>165</b><span>Codex threads</span></div>
+          <div class="fact"><b>34</b><span>Remote Control sessions</span></div>
+          <div class="fact"><b>14</b><span>Claude cloud sessions</span></div>
+        </div>
+        <ul>
+          <li>The 6 blocked background sessions have been waiting between 13 and 27 days each.</li>
+          <li>One session repeatedly reported that it was waiting for input while nobody was watching.</li>
+          <li>Another session stopped on a model refusal on Aug 20 and hasn't moved since.</li>
+          <li>Claude and Codex are both working in <code>~/src/agent-dashboard</code> right now. Nothing warns about it.</li>
+        </ul>
+        <p>The root cause: a session's state lives inside that session. You only learn it needs you by going to look.</p>
+      </section>
+
+      <section id="goals">
+        <h2><span class="n">§3</span>Goals and non-goals</h2>
+        <h3>Goals</h3>
+        <ul>
+          <li>Answer “does anything need me?” from the menu bar icon, without clicking.</li>
+          <li>Show a correct state for every session. A false “waiting on you” costs more than a missing one, because it teaches you to ignore the icon.</li>
+          <li>Get from any session row to the place you can act on it in one click.</li>
+          <li>Cover Claude Code and Codex: this Mac first, then other machines and the cloud.</li>
+          <li>Cost nearly nothing to run: under 1% CPU at idle, and no transcript content leaves the machine unless you turn that on.</li>
+        </ul>
+        <h3>Non-goals</h3>
+        <ul>
+          <li>A transcript viewer or chat client. Rows link out to the real session.</li>
+          <li>Starting new agents, in the first version.</li>
+          <li>App Store distribution, or a UI for Windows or Linux. Linux machines get a collector in the hub phase, not an app.</li>
+          <li>Dollar cost tracking. Token counts are shown; pricing can come later.</li>
+        </ul>
+      </section>
+
+      <section id="experience">
+        <h2><span class="n">§4</span>Experience</h2>
+        <p>The <a href="../mockups/agent-tower.html" target="_blank" rel="noopener">mockup</a> shows the panel with sample session names and messages. One correction to it: rows should show how long a session has been in its current state, not how long ago it started (see §8).</p>
+
+        <h3>Menu bar icon</h3>
+        <p>The icon is a count plus a 3×3 grid of dots, one dot per active session. Active means working, waiting or error. Dots are ordered error first, then waiting, then working, and show the first 9.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Icon</th><th>State</th><th>Rule</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="glyph" aria-hidden="true"><span class="pips"><i class="p"></i><i class="p"></i><i class="p"></i><i class="p"></i></span></span></td>
+                <td>Quiet</td>
+                <td>Nothing working, waiting or in error. Dim dots stand for idle and finished sessions.</td>
+              </tr>
+              <tr>
+                <td><span class="glyph" aria-hidden="true"><span class="pips"><i class="p work"></i><i class="p work"></i><i class="p work"></i></span></span></td>
+                <td>Working</td>
+                <td>At least one session working, none waiting. Cyan dots breathe.</td>
+              </tr>
+              <tr>
+                <td><span class="glyph" aria-hidden="true"><span class="g-count">2</span><span class="pips"><i class="p wait"></i><i class="p wait"></i><i class="p work"></i></span></span></td>
+                <td>Waiting on you</td>
+                <td>The count is the number of sessions waiting or in error. Amber dots blink slowly.</td>
+              </tr>
+              <tr>
+                <td><span class="glyph" aria-hidden="true"><span class="g-count fault">1</span><span class="pips"><i class="p fault"></i><i class="p work"></i><i class="p work"></i></span></span></td>
+                <td>Error</td>
+                <td>Any session in error turns the count red, even when others are only waiting.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Panel</h3>
+        <p>The header shows the waiting count, the longest wait, and a count per source: This Mac, Remote Control and Cloud. A source whose adapter is failing turns grey and says why. Below the header come four sections:</p>
+        <ul>
+          <li><strong>Waiting on you.</strong> Sessions in <span class="chip waiting">waiting</span> or <span class="chip error">error</span>, most recent first, because you still remember the context of fresh ones. Sessions waiting more than 7 days fold into a <em>Stale</em> group with a <em>Stop all</em> action. Today that group would hold all 6.</li>
+          <li><strong>Working.</strong> Sessions in <span class="chip working">working</span>, each with a live activity trace, plus any collision warning (§12).</li>
+          <li><strong>Elsewhere.</strong> Counts and top names for Remote Control and cloud sessions.</li>
+          <li><strong>Finished.</strong> Background sessions that finished in the last 24 hours.</li>
+        </ul>
+        <p>Each row shows the state dot, name, tool and tags on the first line, and repo and branch or worktree on the second. The third line holds what the session is asking, or its last message, clamped to two lines; expanding a row shows the full text and its actions. The right edge shows time in the current state, or the activity trace for working sessions.</p>
+
+        <h3>Notifications</h3>
+        <ul>
+          <li>Notify when a session enters waiting or error, once it has stayed there 20 seconds. Agents often ask and then carry on after an auto-approval.</li>
+          <li>Notify when a background session finishes. Interactive sessions don't notify on finish by default; that's a setting.</li>
+          <li>If more than 3 sessions change within a minute, send one summary notification instead of one each.</li>
+          <li>Notification actions: <em>Attach</em> and <em>Snooze 1 hour</em>. The same state never notifies twice. macOS Focus modes apply automatically.</li>
+        </ul>
+
+        <h3>Keyboard</h3>
+        <p><code>⌥ Space</code> opens and closes the panel from anywhere, and the shortcut can be changed. Typing filters sessions, arrow keys move between them, Return expands one, <code>⌘ Return</code> runs its primary action, and Esc closes the panel.</p>
+
+        <h3>Actions</h3>
+        <div class="table-wrap">
+          <table class="wide">
+            <thead><tr><th>Action</th><th>Claude Code on this Mac</th><th>Codex on this Mac</th><th>Remote and cloud</th></tr></thead>
+            <tbody>
+              <tr><td>Attach / open</td><td><code>claude attach &lt;id&gt;</code> in a new Ghostty window</td><td><code>codex resume &lt;id&gt;</code> in Ghostty; Desktop and VS Code threads open in their own app</td><td>The claude.ai/code session page</td></tr>
+              <tr><td>Reply</td><td class="muted">Not in v1. No documented way to message a background session.</td><td><code>codex queue --thread &lt;id&gt; --message …</code></td><td class="muted">Later, through the hub</td></tr>
+              <tr><td>Stop</td><td><code>claude stop &lt;id&gt;</code>, after confirming</td><td class="muted">Open question</td><td class="muted">—</td></tr>
+              <tr><td>Restart</td><td><code>claude respawn &lt;id&gt;</code></td><td class="muted">—</td><td class="muted">—</td></tr>
+              <tr><td>Open PR</td><td>The <code>prUrl</code> from the transcript's <code>pr-link</code> entry</td><td class="muted">—</td><td class="muted">—</td></tr>
+              <tr><td>Transcript</td><td><code>claude logs &lt;id&gt;</code>, or reveal the <code>.jsonl</code></td><td>Reveal the rollout file</td><td class="muted">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="architecture">
+        <h2><span class="n">§5</span>Architecture</h2>
+<pre class="mermaid">
+flowchart LR
+  subgraph mac["This Mac"]
+    cc["Claude Code<br/>claude agents --json<br/>sessions + transcripts"]
+    cx["Codex<br/>state_5.sqlite<br/>rollout files"]
+    hk["Claude hooks<br/>Codex notify"]
+    col["Collector<br/>adapters, state engine, store"]
+    app["Menu bar app"]
+    cc --> col
+    cx --> col
+    hk -- events --> col
+    col -- "localhost stream" --> app
+    app -- actions --> col
+  end
+  cloud["Codex Cloud"]
+  col -. "poll every 60 s" .-> cloud
+  subgraph others["Other machines"]
+    col2["Collector"]
+  end
+  hub["Hub<br/>Worker + Durable Object"]
+  col -- summaries --> hub
+  col2 -- summaries --> hub
+  hub -- "remote sessions" --> col
+</pre>
+        <p>Data only moves one way. Adapters read the sources, the state engine decides each session's state, and the store keeps current sessions plus a history of state changes. The app is a view of the store: it never reads Claude or Codex files itself.</p>
+
+        <div class="decision">
+          <p class="k">Decision</p>
+          <p class="choice">The collector is its own process, not part of the app.</p>
+          <p>The same binary runs headless on other machines, can be tested without a UI, and can feed a web dashboard later. It does mean two pieces instead of one, so the app bundles the collector and registers it as a login item. You still install one thing.</p>
+        </div>
+        <div class="decision">
+          <p class="k">Decision</p>
+          <p class="choice">Write the collector in TypeScript on Bun, compiled with <code>bun build --compile</code> into a single binary.</p>
+          <p>It runs on macOS and Linux, has SQLite built in, and handles JSONL naturally. A Swift collector inside the app was rejected because it wouldn't run on Linux machines.</p>
+        </div>
+      </section>
+
+      <section id="sources">
+        <h2><span class="n">§6</span>Data sources</h2>
+        <p>Everything below exists today. “Undocumented” means an internal file format that can change with any release; §15 covers that risk.</p>
+        <div class="table-wrap">
+          <table class="wide">
+            <thead><tr><th>Source</th><th>What it gives us</th><th>How we read it</th><th>Stability</th></tr></thead>
+            <tbody>
+              <tr><td><code>claude agents --json</code></td><td>Local Claude sessions: id, name, working directory, kind, and a state of <code>blocked</code>, <code>working</code> or <code>done</code> for background sessions</td><td>Run whenever the sessions folder changes, and every 15 s</td><td>Documented scripting flag</td></tr>
+              <tr><td><code>~/.claude/sessions/&lt;pid&gt;.json</code></td><td>PID, <code>busy</code>/<code>idle</code>, last update, <code>bridgeSessionId</code>, messaging socket path</td><td>File watch</td><td>Undocumented</td></tr>
+              <tr><td><code>~/.claude/projects/*/&lt;id&gt;.jsonl</code></td><td>Last prompt, last message, API errors, token usage, PR links, files edited, worktree state</td><td>Tail from a saved byte offset</td><td>Undocumented</td></tr>
+              <tr><td>Claude Code hooks</td><td>The exact moment of a permission prompt, turn end, session start and session end</td><td>A hook command posts to the collector</td><td>Documented</td></tr>
+              <tr><td><code>~/.codex/state_5.sqlite</code></td><td>Every thread's title, directory, branch, model, token count and source, plus parent/child links in <code>thread_spawn_edges</code></td><td>Read-only query whenever the database's write-ahead log changes</td><td>Undocumented; schema version is in the filename</td></tr>
+              <tr><td><code>~/.codex/sessions/YYYY/MM/DD/*.jsonl</code></td><td><code>task_started</code>, <code>task_complete</code>, <code>turn_aborted</code>, messages, token counts</td><td>Tail from a saved byte offset</td><td>Undocumented</td></tr>
+              <tr><td>Codex <code>notify</code></td><td>One call per finished turn</td><td>A wrapper command (§11)</td><td>Documented config</td></tr>
+              <tr><td><code>codex cloud list --json</code></td><td>Codex Cloud tasks</td><td>Poll every 60 s</td><td>Experimental CLI</td></tr>
+              <tr><td>Remote Control and Claude cloud sessions</td><td>Your account-wide list of Claude sessions</td><td class="muted">No CLI found</td><td class="muted">Gap, see §13</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="model">
+        <h2><span class="n">§7</span>Session model</h2>
+        <p>Every adapter produces the same shape. Fields an adapter can't fill stay empty; nothing is guessed.</p>
+<pre class="code">type State = "working" | "waiting" | "error" | "idle" | "finished" | "offline" | "unknown";
+
+interface Session {
+  key: string;              <span class="c">// "claude:&lt;sessionId&gt;" or "codex:&lt;threadId&gt;"</span>
+  tool: "claude" | "codex";
+  origin: "local" | "remote-control" | "cloud";
+  machine: string;          <span class="c">// "studio.local"</span>
+  name: string;
+  kind: "interactive" | "background" | "desktop" | "ide" | "subagent" | "cloud-task";
+  cwd?: string;
+  repo?: string;
+  branch?: string;
+  worktree?: string;
+
+  state: State;
+  stateSince: string;       <span class="c">// time of the turn that caused this state</span>
+  lastActivityAt: string;
+  ask?: { text: string; options?: string[] };  <span class="c">// what it's waiting for</span>
+  lastMessage?: string;     <span class="c">// at most 280 characters, code blocks removed</span>
+  error?: { kind: string; detail?: string };
+
+  model?: string;
+  tokens?: { input: number; output: number; cached: number };
+  parentKey?: string;       <span class="c">// Codex subagents, Claude background tasks</span>
+  pr?: { number: number; url: string };
+  links: { attach?: string[]; web?: string; transcriptPath?: string };
+
+  aliases: string[];        <span class="c">// bridgeSessionId and similar, for merging duplicates</span>
+  provenance: Partial&lt;Record&lt;keyof Session, SourceId&gt;&gt;;  <span class="c">// which adapter set each field</span>
+}</pre>
+      </section>
+
+      <section id="state">
+        <h2><span class="n">§8</span>State engine</h2>
+        <p>State is the product. The engine combines every signal it has into one state per session and records when that state began.</p>
+        <div class="table-wrap">
+          <table class="wide">
+            <thead><tr><th>State</th><th>Meaning</th><th>Claude Code signal</th><th>Codex signal</th></tr></thead>
+            <tbody>
+              <tr><td><span class="chip working">working</span></td><td>Model or tools are running</td><td><code>agents</code> state <code>working</code>, or session <code>busy</code></td><td><code>task_started</code> with no later <code>task_complete</code> or <code>turn_aborted</code></td></tr>
+              <tr><td><span class="chip waiting">waiting</span></td><td>Can't continue without you</td><td><code>agents</code> state <code>blocked</code>, or a <code>Notification</code> hook for a permission prompt</td><td class="muted">Pending approval: signal not yet known (Q3)</td></tr>
+              <tr><td><span class="chip error">error</span></td><td>Stopped on a failure</td><td>Assistant entry with <code>isApiErrorMessage: true</code>, or a system entry such as <code>model_refusal_no_fallback</code></td><td><code>turn_aborted</code> not caused by you (Q4)</td></tr>
+              <tr><td><span class="chip">idle</span></td><td>Your turn in an interactive session, nothing pending</td><td>Interactive session, <code>idle</code></td><td>Interactive thread after <code>task_complete</code></td></tr>
+              <tr><td><span class="chip">finished</span></td><td>Background work is done</td><td><code>agents</code> state <code>done</code></td><td>Exec run, subagent or cloud task complete</td></tr>
+              <tr><td><span class="chip">offline</span></td><td>Remote machine unreachable</td><td colspan="2">No heartbeat from its collector for 2 minutes</td></tr>
+              <tr><td><span class="chip">unknown</span></td><td>No adapter can tell</td><td colspan="2">Shown grey, never counted in the icon</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Rules</h3>
+        <ul>
+          <li><strong>Precedence.</strong> When sources disagree: hook events beat CLI state, CLI state beats transcript inference, and transcript inference beats file timestamps. Within a tier, the newer signal wins.</li>
+          <li><strong>When a state began.</strong> <code>stateSince</code> is the time of the last user or assistant turn, ignoring bookkeeping entries. One session has an <code>informational</code> system entry on Aug 24, so the naive last timestamp says it has waited 17 days. Its last real turn was the refusal on Aug 20, 21 days ago.</li>
+          <li><strong>Hold time.</strong> A session must stay in waiting or error for 20 seconds before the icon count or a notification changes. Working shows immediately.</li>
+          <li><strong>Idle doesn't count.</strong> Idle interactive sessions are listed but never add to the count. Whether they should is Q6.</li>
+        </ul>
+      </section>
+
+      <section id="collector">
+        <h2><span class="n">§9</span>Collector</h2>
+        <ul>
+          <li><strong>Process.</strong> One binary, <code>tower-collector</code>. On a Mac it ships inside the app and runs as a login item; on Linux it runs as a systemd user service.</li>
+          <li><strong>Watching.</strong> File-system events on <code>~/.claude/sessions</code>, <code>~/.claude/projects</code>, <code>~/.codex/sessions</code> and Codex's database log file. It only tails transcripts that belong to live sessions or changed in the last 7 days.</li>
+          <li><strong>Tailing.</strong> It saves a byte offset per file and reads only the last 512 KB the first time it sees a file. That matters: one active transcript here is 55 MB, <code>~/.claude/projects</code> totals 2.4 GB and <code>~/.codex/sessions</code> 1.2 GB. Nothing is ever parsed in full.</li>
+          <li><strong>Codex database.</strong> Opened read-only and never written. Busy errors are retried. The schema is checked on startup; an unexpected one marks the adapter unhealthy instead of crashing.</li>
+          <li><strong>Store.</strong> Current sessions live in memory. State changes go to a local SQLite file kept for 14 days, which drives the Finished section, stale detection and the success measures in §16.</li>
+          <li><strong>Local API.</strong> Listens on 127.0.0.1 only, on a random port. The port and a bearer token are written to <code>~/Library/Application Support/Agent Tower/collector.json</code>, readable only by you.</li>
+        </ul>
+<pre class="code">GET  /v1/sessions                         <span class="c">// current list</span>
+GET  /v1/events                           <span class="c">// server-sent events: session changed, removed</span>
+POST /v1/sessions/:key/actions/:action    <span class="c">// attach, stop, respawn, reply</span>
+POST /v1/hooks/claude                     <span class="c">// from the Claude hook script</span>
+POST /v1/hooks/codex                      <span class="c">// from the Codex notify wrapper</span>
+GET  /v1/health                           <span class="c">// adapter status and versions</span></pre>
+        <p><strong>Budget.</strong> Under 1% CPU at idle and under 80 MB of memory. A change backed by a hook shows in the app within 1 second; anything else within 3 seconds.</p>
+      </section>
+
+      <section id="app">
+        <h2><span class="n">§10</span>Menu bar app</h2>
+        <div class="decision">
+          <p class="k">Decision</p>
+          <p class="choice">AppKit status item and floating panel, both hosting SwiftUI views. Not SwiftUI's <code>MenuBarExtra</code>.</p>
+          <p>The icon animates, and <code>⌥ Space</code> has to open the panel. <code>MenuBarExtra</code> has had no public way to open it from code (true through macOS 15; recheck on 26, Q7).</p>
+        </div>
+        <ul>
+          <li><strong>Target:</strong> macOS 26 only, using its glass effect with no fallback. Xcode 26.6 is installed.</li>
+          <li><strong>Hotkey:</strong> Carbon's <code>RegisterEventHotKey</code>, which doesn't need Accessibility permission.</li>
+          <li><strong>Notifications:</strong> <code>UNUserNotificationCenter</code> with Attach and Snooze actions.</li>
+          <li><strong>Opening sessions:</strong> a new Ghostty window running the attach or resume command. The exact invocation is Q5.</li>
+          <li><strong>Distribution:</strong> not sandboxed, because it launches the Claude and Codex CLIs and the collector reads their folders. Signed with a Developer ID; notarized only if shared.</li>
+          <li><strong>Reduced motion:</strong> the dots stop animating and the count stays.</li>
+          <li><strong>Settings:</strong> hotkey, which events notify, whether idle sessions show, stale threshold, hub on or off, and whether message text is shown.</li>
+        </ul>
+      </section>
+
+      <section id="hooks">
+        <h2><span class="n">§11</span>Hooks and notify</h2>
+        <p>Polling can tell a session is blocked, but only hooks know the moment it happens. Both integrations edit settings files that belong to other tools, so setup shows the exact change and asks before writing it.</p>
+        <h3>Claude Code</h3>
+        <p>Setup adds entries for <code>Notification</code>, <code>Stop</code>, <code>SessionStart</code> and <code>SessionEnd</code> to <code>~/.claude/settings.json</code>. They sit next to your existing <code>Notification</code>, <code>Stop</code>, <code>UserPromptSubmit</code> and <code>WorktreeRemove</code> hooks. The hook script forwards the event JSON to the collector with a 1-second timeout, prints nothing and always exits 0, so it can never slow or block a session. Removing Agent Tower removes only its own entries.</p>
+        <h3>Codex</h3>
+        <p>Codex's <code>notify</code> setting takes one command, and yours is already used by Codex Computer Use. Setup replaces it with a wrapper that runs the original command first, with the same arguments, then posts to the collector. Removing Agent Tower puts the original line back.</p>
+      </section>
+
+      <section id="collisions">
+        <h2><span class="n">§12</span>Collisions</h2>
+        <ul>
+          <li><strong>Version 1, same checkout.</strong> Warn when two or more working sessions share a working tree root, from <code>git rev-parse --show-toplevel</code>. Separate worktrees of one repo don't count; keeping agents apart is what worktrees are for.</li>
+          <li><strong>Version 2, same file.</strong> Claude's <code>file-history-delta</code> entries record each edited file (<code>trackingPath</code> plus <code>realParentDir</code>), and Codex's patch tool calls name their files. Warn when two sessions edit the same file within 30 minutes.</li>
+        </ul>
+      </section>
+
+      <section id="remote">
+        <h2><span class="n">§13</span>Other machines and cloud</h2>
+        <ul>
+          <li><strong>Hub.</strong> A Cloudflare Worker with one Durable Object per account. Each collector connects over a WebSocket with its own machine token. The web view sits behind Cloudflare Access.</li>
+          <li><strong>What's sent.</strong> Session summaries (the model in §7 minus local file paths) and a heartbeat every 30 seconds. A machine goes offline after 2 minutes without one.</li>
+          <li><strong>Merging duplicates.</strong> A local Claude session's <code>bridgeSessionId</code> matches its Remote Control and claude.ai id. Matches merge into one row marked local.</li>
+          <li><strong>Codex Cloud.</strong> The collector on your main Mac polls <code>codex cloud list --json</code> using your existing Codex login. The hub never holds OpenAI credentials.</li>
+          <li><strong>Claude cloud and Remote Control.</strong> No CLI returns the account-wide list. Until one exists (Q1), these sessions appear only when repo-level hooks in <code>.claude/settings.json</code> report them, which depends on Q2. The Elsewhere section says plainly what it can't see.</li>
+        </ul>
+      </section>
+
+      <section id="privacy">
+        <h2><span class="n">§14</span>Privacy and security</h2>
+        <ul>
+          <li>Until the hub milestone, nothing leaves the machine.</li>
+          <li>The hub is opt-in. It receives names, states, repo, branch and token counts. Message text is off by default for the hub.</li>
+          <li>The local API accepts only loopback connections that present the token.</li>
+          <li>Stopping or replying to a session always takes an explicit click, and stopping asks for confirmation. Remote actions through the hub wait until M4 and get their own permission.</li>
+          <li>Agent Tower never writes to Claude or Codex data. Its only edits to their files are the settings changes in §11, made with your consent.</li>
+        </ul>
+      </section>
+
+      <section id="risks">
+        <h2><span class="n">§15</span>Risks</h2>
+        <div class="table-wrap">
+          <table class="wide">
+            <thead><tr><th>Risk</th><th>Likelihood</th><th>Mitigation</th></tr></thead>
+            <tbody>
+              <tr><td>File formats change in an update (Claude 2.1.267 and Codex 0.153.4 today)</td><td>High</td><td>Tests against real samples captured from each version, a version check at startup, and <span class="chip">unknown</span> plus a health warning instead of guesses or crashes</td></tr>
+              <tr><td>False “waiting on you”</td><td>Medium</td><td>Source precedence, the 20-second hold, accuracy measured in M0, and a “Not waiting” button that records a false positive</td></tr>
+              <tr><td>Large transcripts cost CPU</td><td>Medium</td><td>Byte-offset tailing, the 512 KB first read, and only live or recent files</td></tr>
+              <tr><td>A hook slows a session</td><td>Low</td><td>1-second timeout, no output, always exits 0</td></tr>
+              <tr><td>Too many notifications</td><td>Medium</td><td>Only waiting, error and background finishes; the hold time; coalescing; snooze</td></tr>
+              <tr><td>No account-wide Claude session list</td><td>High</td><td>Hook-based reporting, and an honest “can't see” note in Elsewhere</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="milestones">
+        <h2><span class="n">§16</span>Milestones</h2>
+        <p>Durations are rough estimates. Each milestone ends when its exit criteria are met, not on a date.</p>
+        <ol class="milestones">
+          <li>
+            <h3><span class="m">M0</span>Collector spike <span class="d">1–2 days</span></h3>
+            <p>Adapters for <code>claude agents</code>, Claude session files and transcripts, and Codex's database and rollout files. Prints the session list and logs every state change for a day.</p>
+            <p class="exit"><b>Exit:</b> spot checks through that day match reality for every session, and <code>stateSince</code> is right for all 6 blocked sessions.</p>
+          </li>
+          <li>
+            <h3><span class="m">M1</span>Menu bar app <span class="d">about 1 week</span></h3>
+            <p>Icon, panel, notifications, Attach in Ghostty, search, <code>⌥ Space</code>, and the bundled collector.</p>
+            <p class="exit"><b>Exit:</b> a week of daily use in which no session waits more than 24 hours without you knowing.</p>
+          </li>
+          <li>
+            <h3><span class="m">M2</span>Accuracy <span class="d">about 1 week</span></h3>
+            <p>Claude hooks, the Codex notify wrapper, error detection, same-checkout collisions, and the Stale group with Stop all.</p>
+            <p class="exit"><b>Exit:</b> fewer than 1 in 20 “waiting” notifications marked as false.</p>
+          </li>
+          <li>
+            <h3><span class="m">M3</span>Hub</h3>
+            <p>Collectors on other machines, Codex Cloud, duplicate merging through bridge ids, offline states.</p>
+            <p class="exit"><b>Exit:</b> a session on a second machine shows in the menu bar within 5 seconds of changing state.</p>
+          </li>
+          <li>
+            <h3><span class="m">M4</span>Actions and depth</h3>
+            <p>Replying to Codex via <code>codex queue</code>, same-file collisions, token trends, subagent trees.</p>
+          </li>
+        </ol>
+        <p><strong>Measure of success:</strong> blocked sessions older than 24 hours go from 6 today to zero and stay there.</p>
+      </section>
+
+      <section id="questions">
+        <h2><span class="n">§17</span>Open questions</h2>
+        <ol class="qs">
+          <li>Is there an API or CLI that returns the account-wide Claude session list, including Remote Control and cloud sessions?</li>
+          <li>Do Claude cloud sessions run project hooks, and can they reach the hub from their sandbox?</li>
+          <li>How does Codex signal a pending approval? No approval events appear in the last 30 days of rollout files here, because approvals go through auto-review, so this needs a deliberate test.</li>
+          <li>Does <code>turn_aborted</code> say whether you interrupted the turn or it failed?</li>
+          <li>What is the exact Ghostty invocation to open a new window running a command?</li>
+          <li>Should idle interactive sessions count toward the icon? Proposal: no. List them in a quiet Idle group.</li>
+          <li>Can <code>MenuBarExtra</code> on macOS 26 be opened from code? If so, revisit the decision in §10.</li>
+          <li>For stale sessions, should Agent Tower offer to stop them automatically after some number of days, or only suggest it?</li>
+        </ol>
+      </section>
+
+      <footer class="end">Figures come from this Mac at 3:02 PM on Sep 10, 2026: <code>claude agents --json</code>, Claude transcripts, Codex's <code>state_5.sqlite</code> and rollout files, and the Claude Code session list.</footer>
+    </main>
+  </div>
+</div>
+
+<script>
+  (() => {
+    const links = [...document.querySelectorAll('.toc a')];
+    if (!links.length || !('IntersectionObserver' in window)) return;
+    const byId = new Map(links.map((a) => [a.getAttribute('href').slice(1), a]));
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) {
+          links.forEach((a) => a.classList.remove('on'));
+          byId.get(e.target.id)?.classList.add('on');
+        }
+      });
+    }, { rootMargin: '-10% 0px -75% 0px' });
+    document.querySelectorAll('main section[id]').forEach((s) => io.observe(s));
+  })();
+</script>

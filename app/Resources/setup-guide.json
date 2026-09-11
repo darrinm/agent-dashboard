@@ -1,0 +1,402 @@
+[
+  {
+    "id": "start",
+    "title": "Getting started",
+    "subtitle": "Your existing sessions, one glance away.",
+    "symbol": "sparkles",
+    "blocks": [
+      {
+        "kind": "heading",
+        "text": "1. Put Agents in Applications"
+      },
+      {
+        "kind": "text",
+        "text": "Move **Agents.app** to your **Applications** folder, then open it. Agents lives in the menu bar; it does not need a Dock icon. Keep the app in the same place after enabling hooks or launch at login."
+      },
+      {
+        "kind": "heading",
+        "text": "2. Keep using your agents normally"
+      },
+      {
+        "kind": "text",
+        "text": "Claude Code and Codex must already be installed and signed in under your Mac user account. Start or continue a session in your usual terminal or app. Agents discovers existing local sessions automatically, including sessions started before Agents was installed."
+      },
+      {
+        "kind": "text",
+        "text": "The collector is included in the app and starts automatically. You do not need Go, Xcode, the source repository, or a hub for local monitoring."
+      },
+      {
+        "kind": "heading",
+        "text": "3. Open the panel"
+      },
+      {
+        "kind": "text",
+        "text": "Click the dot grid in the menu bar, or press **Option–Space**. Search for a session, project, provider, or machine. Use the arrow keys to move through visible sessions, **Return** to expand or collapse it in place, and **Escape** to collapse expanded sessions or close the panel."
+      },
+      {
+        "kind": "heading",
+        "text": "4. Make it yours"
+      },
+      {
+        "kind": "text",
+        "text": "Open the gear button for Settings. Choose your appearance and shortcut, optionally enable notifications, and turn on **Launch at login** if you want Agents available after signing in."
+      },
+      {
+        "kind": "note",
+        "text": "This release requires macOS 26 or later. Its setup guide travels inside the app and works offline."
+      }
+    ]
+  },
+  {
+    "id": "panel",
+    "title": "Reading the dashboard",
+    "subtitle": "Understand what needs you and what is still running.",
+    "symbol": "square.grid.3x3",
+    "blocks": [
+      {
+        "kind": "heading",
+        "text": "The menu bar"
+      },
+      {
+        "kind": "text",
+        "text": "The number counts sessions that need attention. Amber marks requests, red marks failures, and teal marks active work. A slow blink highlights unseen requests; it stops after you view them. Reduce Motion disables blinking. A plus means more active sessions than fit in the grid; a dash indicates incomplete coverage."
+      },
+      {
+        "kind": "heading",
+        "text": "Needs you"
+      },
+      {
+        "kind": "text",
+        "text": "New requests appear first. Requests older than seven days are grouped under **Older requests** and remain included in the count. Click anywhere on that group row to expand or collapse it. Imported old requests do not start a notification storm."
+      },
+      {
+        "kind": "text",
+        "text": "Viewing a visible request acknowledges that you have seen it. It stays unresolved until the source reports evidence of progress or resolution. Merely opening the panel does not acknowledge hidden rows."
+      },
+      {
+        "kind": "heading",
+        "text": "Working and ready to review"
+      },
+      {
+        "kind": "text",
+        "text": "Working sessions show activity drawn from recorded output-token counts over the last fifteen minutes. Dotted spans represent observed tool activity. A quiet line is not proof that a session failed."
+      },
+      {
+        "kind": "text",
+        "text": "Recently completed turns appear in **Ready to review** for up to twenty-four hours. Older output and other inactive sessions are available in **Idle and disconnected**, and through search."
+      },
+      {
+        "kind": "heading",
+        "text": "Opening a session"
+      },
+      {
+        "kind": "text",
+        "text": "Click a session row to expand its details in place, and click again to collapse it. Several sessions can remain expanded for comparison. The expanded area offers the actions its source supports. Local Claude background sessions may offer **Attach in Ghostty**. Codex offers project, transcript, and session-ID navigation when available. Agents does not start another live Codex process as a substitute for focusing an existing session."
+      }
+    ]
+  },
+  {
+    "id": "sources",
+    "title": "Sources & coverage",
+    "subtitle": "See where each status comes from.",
+    "symbol": "antenna.radiowaves.left.and.right",
+    "blocks": [
+      {
+        "kind": "heading",
+        "text": "Claude Code on this machine"
+      },
+      {
+        "kind": "text",
+        "text": "Agents combines the Claude session inventory with local session records and incremental transcript reads. Optional lifecycle hooks improve prompt and permission visibility. Existing sessions are discovered even when they have not adopted new hooks."
+      },
+      {
+        "kind": "heading",
+        "text": "Codex on this machine"
+      },
+      {
+        "kind": "text",
+        "text": "This version reads the local thread database and rollout files. Codex status comes from saved activity and may differ from the live session. The panel shows limited coverage: approvals that are not written to those files may not appear. Project and transcript navigation remain available."
+      },
+      {
+        "kind": "heading",
+        "text": "Cloud VMs and other computers"
+      },
+      {
+        "kind": "text",
+        "text": "A collector running on each machine sends structured updates to your hub. Your Mac displays them alongside local sessions. The collector needs access to that machine’s existing provider installation and login."
+      },
+      {
+        "kind": "heading",
+        "text": "Provider-managed cloud services"
+      },
+      {
+        "kind": "text",
+        "text": "This release does not list account-wide Claude cloud sessions or managed Codex Cloud tasks. Sessions running on your own cloud VM are supported through a collector on that VM."
+      },
+      {
+        "kind": "note",
+        "text": "Settings lists each source and its health. A machine going offline preserves its last request; it never means the work completed."
+      }
+    ]
+  },
+  {
+    "id": "notifications",
+    "title": "Notifications",
+    "subtitle": "Get useful interruptions, on your terms.",
+    "symbol": "bell",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "In Settings, enable **Notify when an agent needs me**, then allow notifications when macOS asks. If you previously denied permission, enable Agents in **System Settings → Notifications**."
+      },
+      {
+        "kind": "text",
+        "text": "Notifications wait briefly for requests to settle and avoid repeating the same attention episode. Larger batches are grouped. Requests older than seven days are not announced on import."
+      },
+      {
+        "kind": "text",
+        "text": "Message text and sounds are separate preferences. Message text is hidden by default; completed-turn notifications are also opt-in."
+      },
+      {
+        "kind": "text",
+        "text": "Open a notification to see its current request, or snooze an individual request for one hour. Snoozing notifications does not resolve the request."
+      },
+      {
+        "kind": "note",
+        "text": "Focus and system notification settings can suppress delivery. The menu bar count remains available."
+      }
+    ]
+  },
+  {
+    "id": "hooks",
+    "title": "Lifecycle hooks",
+    "subtitle": "Improve live visibility while preserving your existing setup.",
+    "symbol": "bolt.horizontal",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "In Settings, choose **Enable live lifecycle hooks…**. Agents explains the configuration change before applying it. Local discovery continues to work if you leave hooks disabled."
+      },
+      {
+        "kind": "text",
+        "text": "For Claude, Agents adds its own lifecycle handlers alongside existing hooks. For Codex, it wraps the existing notify command and forwards the original arguments, so your current notification integration continues to run."
+      },
+      {
+        "kind": "text",
+        "text": "Already-running sessions may only adopt new hooks after their provider restarts. You can keep them running: inventory and transcript discovery still cover them to the extent described under Sources & coverage."
+      },
+      {
+        "kind": "heading",
+        "text": "Moving the app or removing hooks"
+      },
+      {
+        "kind": "text",
+        "text": "Choose **Remove Agents hooks** before moving or uninstalling Agents. Re-enable them after opening the app at its new location. Removal preserves unrelated handlers and restores the previous Codex notify command when Agents still owns that setting."
+      },
+      {
+        "kind": "note",
+        "text": "Enabling hooks observes lifecycle events. It does not grant Agents permission to approve prompts, reply, stop, or restart your agent sessions."
+      }
+    ]
+  },
+  {
+    "id": "remote",
+    "title": "Other machines",
+    "subtitle": "Connect this Mac to an existing hub.",
+    "symbol": "network",
+    "blocks": [
+      {
+        "kind": "heading",
+        "text": "What you need"
+      },
+      {
+        "kind": "text",
+        "text": "You need your hub’s **HTTPS URL** and a fresh **pairing code** from the person running the hub. Each code expires after ten minutes and can be used once. If you run your own hub, follow the Hosting a hub topic first."
+      },
+      {
+        "kind": "heading",
+        "text": "Pair this Mac"
+      },
+      {
+        "kind": "text",
+        "text": "Open **Settings → Other machines**, enter the URL and pairing code, and choose **Connect to hub**. Remote sessions appear after their collectors connect. This Mac’s device credential is stored in Keychain."
+      },
+      {
+        "kind": "heading",
+        "text": "Pair a remote collector"
+      },
+      {
+        "kind": "text",
+        "text": "Install the matching collector executable on the other machine. Use the macOS collector on a matching Mac, or the Linux amd64/arm64 build for that VM’s CPU. Obtain these from the same distributor as Agents. Place the executable in **~/.local/bin/agents-collector** and make it executable."
+      },
+      {
+        "kind": "code",
+        "text": "~/.local/bin/agents-collector enroll --hub https://YOUR-HUB --machine cloud-dev --token-stdin"
+      },
+      {
+        "kind": "text",
+        "text": "Replace YOUR-HUB with your hub’s address. Paste a separate fresh pairing code, press Return, then Ctrl-D. Start the collector:"
+      },
+      {
+        "kind": "code",
+        "text": "~/.local/bin/agents-collector serve --machine cloud-dev"
+      },
+      {
+        "kind": "text",
+        "text": "Run the collector as the user who runs Claude or Codex. If a provider is not on its PATH, add **--claude /absolute/path/to/claude** or **--codex /absolute/path/to/codex**. Use your process supervisor or systemd to keep the collector running after logout."
+      },
+      {
+        "kind": "heading",
+        "text": "Containers and connectivity"
+      },
+      {
+        "kind": "text",
+        "text": "Give each container a unique persistent **AGENTS_MACHINE_ID** before enrollment. Keep its state directory on a persistent volume. Do not copy enrolled credentials into a reusable image. Ordinary machine-identity changes require new enrollment."
+      },
+      {
+        "kind": "text",
+        "text": "The collector buffers unsent events and retries after outages. A healthy hub keeps collecting from remote machines while your Mac sleeps. If a disposable container and its state are deleted, its last unsent events may be lost."
+      }
+    ]
+  },
+  {
+    "id": "hub",
+    "title": "Hosting a hub",
+    "subtitle": "An advanced setup for your personal fleet.",
+    "symbol": "server.rack",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Run one hub on an always-on Mac or Linux machine with persistent storage. Use the matching collector executable supplied with Agents. The same executable provides both collector and hub commands."
+      },
+      {
+        "kind": "heading",
+        "text": "1. Start the hub"
+      },
+      {
+        "kind": "code",
+        "text": "~/.local/bin/agents-collector hub --data-dir \"$HOME/.local/state/agents-hub\" --listen 127.0.0.1:8788"
+      },
+      {
+        "kind": "text",
+        "text": "Keep that directory on a persistent volume. Configure your HTTPS reverse proxy to forward your chosen hub URL to the loopback service. Collectors require HTTPS outside localhost. This release does not provision hosting or a domain for you."
+      },
+      {
+        "kind": "heading",
+        "text": "2. Create a pairing code"
+      },
+      {
+        "kind": "text",
+        "text": "On the hub host, run the following with Python 3. It reads the private admin token from the hub directory and prints a short-lived, single-use pairing code."
+      },
+      {
+        "kind": "code",
+        "text": "python3 - <<'PY'\nimport json, pathlib, urllib.request\nsecret = (pathlib.Path.home() / \".local/state/agents-hub/admin-token\").read_text()\nrequest = urllib.request.Request(\n    \"http://127.0.0.1:8788/v1/admin/enrollment\",\n    data=b\"{}\",\n    headers={\"Authorization\": \"Bearer \" + secret},\n    method=\"POST\")\nprint(json.load(urllib.request.urlopen(request))[\"token\"])\nPY"
+      },
+      {
+        "kind": "text",
+        "text": "Create a separate code for your Mac and every remote collector, then follow Other machines. Keep the admin token on the hub host; pairing codes are the only credentials you need to give to a new collector."
+      },
+      {
+        "kind": "heading",
+        "text": "3. Keep the service running"
+      },
+      {
+        "kind": "text",
+        "text": "Use your host’s service manager to restart the hub after reboot. Keep its SQLite directory and admin token together when backing it up. This hub is a single-account service with one SQLite process."
+      },
+      {
+        "kind": "heading",
+        "text": "Revoke or delete"
+      },
+      {
+        "kind": "text",
+        "text": "The authenticated admin API supports **POST /v1/admin/revoke/{deviceID}** and **DELETE /v1/admin/sessions/{sessionID}**. Use the same admin Authorization header as the pairing-code example. Revoked devices lose fleet access. Deleted remote history has a replay barrier and disappears from connected remote caches; provider transcripts remain on their source machines."
+      }
+    ]
+  },
+  {
+    "id": "privacy",
+    "title": "Privacy & storage",
+    "subtitle": "Know what stays local and what your hub receives.",
+    "symbol": "lock",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "The local app reads session details so it can show useful context. On the Mac, its private state lives in **~/Library/Application Support/Agents**. Linux collectors use **~/.local/state/agents** by default."
+      },
+      {
+        "kind": "text",
+        "text": "Remote upload uses a separate allowlist: structured state, project and machine labels, attention identity, token counts, and tool-running spans. Prompts, excerpts, raw commands, tool arguments, branches, and navigation paths are excluded. Provider account credentials stay on their source machines."
+      },
+      {
+        "kind": "text",
+        "text": "macOS hub credentials use Keychain. Linux uses protected local files. The local collector API accepts an authentication token and listens only on loopback."
+      },
+      {
+        "kind": "text",
+        "text": "Detailed event history is retained for seven days. Inactive summaries expire after thirty days; unresolved requests remain. The remote outbox is capped at one hundred megabytes or seven days. Dropped unsent history appears as a delivery warning."
+      },
+      {
+        "kind": "note",
+        "text": "The diagnostic folder contains local session text and private connection credentials. Share only the specific information you intend to disclose."
+      }
+    ]
+  },
+  {
+    "id": "troubleshooting",
+    "title": "Troubleshooting",
+    "subtitle": "Find the source of a missing or stale update.",
+    "symbol": "wrench.and.screwdriver",
+    "blocks": [
+      {
+        "kind": "heading",
+        "text": "No sessions appear"
+      },
+      {
+        "kind": "text",
+        "text": "Check **Settings → Sources**. Start a session in your usual Claude or Codex app, signed in as the same Mac user. Missing executables, inaccessible files, or unsupported source formats appear as source errors. Agents does not sign in to providers for you."
+      },
+      {
+        "kind": "heading",
+        "text": "The collector is unavailable"
+      },
+      {
+        "kind": "text",
+        "text": "The panel shows cached information while it reconnects. Try **Restart collector** in Settings. If you started a separate collector yourself, restart that process from its service manager instead. Only one collector can own a data directory."
+      },
+      {
+        "kind": "heading",
+        "text": "A request seems wrong"
+      },
+      {
+        "kind": "text",
+        "text": "Open its detail and check the source and evidence. Codex status comes from saved activity, so it can lag the live session or miss a pending approval. A stopped network connection preserves the last state rather than treating a request as answered."
+      },
+      {
+        "kind": "heading",
+        "text": "A remote machine is missing"
+      },
+      {
+        "kind": "text",
+        "text": "Check that its collector and hub are running, its provider login is available, and its HTTPS hub URL is reachable. Expired or reused pairing codes need replacement. A machine-identity change requires fresh enrollment. Recent remote updates can take several seconds to reach the Mac."
+      },
+      {
+        "kind": "heading",
+        "text": "The shortcut or notifications do not work"
+      },
+      {
+        "kind": "text",
+        "text": "Choose another shortcut in Settings if Option–Space is already in use. Check System Settings for notification permission and Focus. Blinking is disabled when Reduce Motion is enabled."
+      },
+      {
+        "kind": "heading",
+        "text": "Removing Agents"
+      },
+      {
+        "kind": "text",
+        "text": "Remove Agents hooks and disable Launch at login in Settings, then quit the app. You can then remove Agents.app. A separately installed remote collector or hub must be stopped through its own service manager. Local history remains in the diagnostic data folder until you remove it."
+      }
+    ]
+  }
+]

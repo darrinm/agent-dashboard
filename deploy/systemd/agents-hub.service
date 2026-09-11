@@ -1,0 +1,15 @@
+[Unit]
+Description=Agents durable session hub
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/agents-collector hub --data-dir %h/.local/state/agents-hub --listen 127.0.0.1:8788
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+UMask=0077
+
+[Install]
+WantedBy=default.target

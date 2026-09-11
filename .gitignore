@@ -1,0 +1,15 @@
+.build/
+.cache/
+.local/
+dist/
+*.app/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-*
+collector.json
+remote.json
+admin-token

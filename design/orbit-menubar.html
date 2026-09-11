@@ -1,0 +1,86 @@
+<div id="orbit-concept" aria-label="Orbit menu bar app concept">
+  <style>
+    #orbit-concept{--orbit-bg:light-dark(#fcfcfd,#191b20);--orbit-ink:light-dark(#20242b,#f0f1f4);--orbit-muted:light-dark(#626975,#a1a7b3);--orbit-line:light-dark(#e5e7eb,#32353d);--orbit-raised:light-dark(#f1f3f6,#24272e);--orbit-accent:light-dark(#276b59,#83dfbf);--orbit-amber:light-dark(#916000,#f3c274);--orbit-wait:light-dark(#fff6e6,#30291e);--orbit-shadow:light-dark(#18233124,#00000060);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--orbit-ink);font-size:13px;line-height:1.45;padding:8px 10px 30px;box-sizing:border-box}
+    #orbit-concept *{box-sizing:border-box}#orbit-concept button{font:inherit;color:inherit;cursor:pointer}#orbit-concept button:focus-visible{outline:2px solid var(--orbit-accent);outline-offset:3px}#orbit-concept [hidden]{display:none!important}
+    #orbit-concept .orbit-bar{max-width:620px;margin:auto;display:flex;align-items:center;justify-content:flex-end;gap:17px;padding:5px 12px;background:var(--orbit-raised);border-radius:9px;color:var(--orbit-ink);min-height:35px}
+    #orbit-concept .orbit-bar>span{font-size:12px}#orbit-concept .orbit-trigger{display:flex;align-items:center;gap:8px;border:0;border-radius:6px;background:var(--orbit-bg);padding:4px 9px;font-variant-numeric:tabular-nums}#orbit-concept .orbit-trigger svg{width:17px;height:17px}#orbit-concept .orbit-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--orbit-amber)}
+    #orbit-concept .orbit-popover{position:relative;max-width:414px;margin:12px auto 0;background:var(--orbit-bg);border:1px solid var(--orbit-line);border-radius:18px;box-shadow:0 15px 36px var(--orbit-shadow);overflow:hidden}
+    #orbit-concept .orbit-header{display:flex;align-items:center;justify-content:space-between;padding:21px 22px 13px}#orbit-concept .orbit-brand{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:500;letter-spacing:2px}#orbit-concept .orbit-brand svg{width:23px;height:23px;color:var(--orbit-accent)}#orbit-concept .orbit-live{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--orbit-muted)}#orbit-concept .orbit-live .orbit-dot{background:var(--orbit-accent)}
+    #orbit-concept .orbit-fleet{display:flex;justify-content:space-between;align-items:center;padding:0 22px 20px;color:var(--orbit-muted);font-size:12px}#orbit-concept .orbit-signals{display:flex;gap:4px;align-items:center;height:20px}#orbit-concept .orbit-signals span{display:block;width:4px;border-radius:2px;background:var(--orbit-accent)}#orbit-concept .orbit-signals span:nth-child(-n+2){background:var(--orbit-amber)}
+    #orbit-concept .orbit-section{padding:0 10px 10px}#orbit-concept .orbit-section-label{display:flex;align-items:center;justify-content:space-between;padding:6px 12px 9px;font-size:10px;text-transform:uppercase;letter-spacing:1.6px;font-weight:500;color:var(--orbit-muted)}#orbit-concept .orbit-section-label.wait-label{color:var(--orbit-amber)}
+    #orbit-concept .orbit-row{width:100%;display:grid;grid-template-columns:27px minmax(0,1fr) auto;align-items:start;text-align:left;gap:9px;border:0;border-radius:10px;background:transparent;padding:12px;margin-bottom:3px}#orbit-concept .orbit-row:hover{background:var(--orbit-raised)}#orbit-concept .orbit-row.waiting{background:var(--orbit-wait)}#orbit-concept .orbit-row.waiting:hover{filter:brightness(.97)}#orbit-concept .orbit-provider{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;border:1px solid var(--orbit-line);font-size:11px;font-weight:500;background:var(--orbit-bg)}#orbit-concept .orbit-task{display:block;font-weight:500;font-size:13px;letter-spacing:-.1px}#orbit-concept .orbit-meta{display:block;font-size:11px;color:var(--orbit-muted);margin-top:3px}#orbit-concept .orbit-status{display:block;font-size:12px;color:var(--orbit-muted);margin-top:6px}#orbit-concept .waiting .orbit-status{color:var(--orbit-amber)}#orbit-concept .orbit-age{font-size:10px;color:var(--orbit-muted);font-variant-numeric:tabular-nums;padding-top:3px}#orbit-concept .orbit-divider{height:1px;background:var(--orbit-line);margin:2px 22px 12px}
+    #orbit-concept .orbit-row.running .orbit-status{display:flex;align-items:center;gap:6px}#orbit-concept .orbit-row.running .orbit-status::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--orbit-accent)}#orbit-concept .orbit-footer{border-top:1px solid var(--orbit-line);padding:12px 22px;display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:10px;color:var(--orbit-muted);letter-spacing:.3px;background:var(--orbit-raised)}#orbit-concept .orbit-footer span:first-child{display:flex;align-items:center;gap:6px}#orbit-concept .orbit-footer svg{height:13px;width:13px}
+    #orbit-concept .orbit-detail{padding:0 22px 23px}#orbit-concept .orbit-back{display:flex;align-items:center;gap:7px;border:0;padding:5px 0 18px;background:none;color:var(--orbit-muted);font-size:12px}#orbit-concept .orbit-back svg{width:14px;height:14px}#orbit-concept .orbit-detail h2{font-size:21px;font-weight:500;letter-spacing:-.5px;margin:8px 0}#orbit-concept .orbit-detail-meta{font-size:12px;color:var(--orbit-muted);margin-bottom:23px}#orbit-concept .orbit-message{background:var(--orbit-raised);border-radius:12px;padding:16px;margin:14px 0 24px;font-size:13px;line-height:1.65}#orbit-concept .orbit-event{display:grid;grid-template-columns:40px 1fr;gap:13px;padding:10px 0;font-size:12px;border-bottom:1px solid var(--orbit-line)}#orbit-concept .orbit-event time{font-size:10px;color:var(--orbit-muted);padding-top:2px}#orbit-concept .orbit-event:last-child{border:0}#orbit-concept .orbit-detail-kicker{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--orbit-muted)}#orbit-concept.compact .orbit-row{padding-top:9px;padding-bottom:9px}#orbit-concept.compact .orbit-status{margin-top:3px}#orbit-concept .orbit-bar-spacer{margin-right:auto;letter-spacing:.1px;color:var(--orbit-muted)}
+    #orbit-concept .orbit-trigger{width:72px;justify-content:space-between}#orbit-concept .orbit-trigger>span{min-width:3ch;text-align:right;color:var(--orbit-amber)}#orbit-concept .orbit-older{margin-top:7px}#orbit-concept .orbit-older summary{cursor:pointer;padding:10px 12px;font-size:12px;color:var(--orbit-muted)}#orbit-concept .orbit-older summary span{float:right;font-size:11px}#orbit-concept .orbit-source{color:var(--orbit-muted);font-size:12px;margin:0 0 20px}
+    @media(max-width:400px){#orbit-concept{padding-left:0;padding-right:0}#orbit-concept .orbit-bar{gap:11px}#orbit-concept .orbit-header{padding-left:18px;padding-right:18px}#orbit-concept .orbit-fleet{padding-left:18px;padding-right:18px}#orbit-concept .orbit-bar-spacer{display:none}}
+    @media(prefers-reduced-motion:no-preference){#orbit-concept .orbit-row{transition:background .16s ease}}
+  </style>
+  <div class="orbit-bar" aria-label="Example macOS menu bar">
+    <span class="orbit-bar-spacer">Thu Sep 10</span>
+    <button class="orbit-trigger" type="button" aria-label="Toggle Orbit: two sessions need attention, three working, all sources connected" aria-expanded="true"><i data-lucide="orbit" aria-hidden="true"></i><span>2</span></button>
+    <i data-lucide="wifi" aria-hidden="true"></i><i data-lucide="battery-full" aria-hidden="true"></i><span>3:42 PM</span>
+  </div>
+  <div class="orbit-popover">
+    <div class="orbit-header"><div class="orbit-brand"><i data-lucide="orbit" aria-hidden="true"></i>ORBIT</div><span class="orbit-live"><span class="orbit-dot"></span>Connected</span></div>
+    <div class="orbit-fleet"><span>6 sessions <span aria-hidden="true">·</span> 3 machines</span><span>3 working</span></div>
+    <div class="orbit-list">
+      <div class="orbit-section">
+        <div class="orbit-section-label wait-label"><span>Needs you</span><span>02</span></div>
+        <button class="orbit-row waiting" type="button" data-session="auth"><span class="orbit-provider">Cx</span><span><span class="orbit-task">Finish the sign-in flow</span><span class="orbit-meta">Codex · web-app · This Mac</span><span class="orbit-status">Has a question for you</span></span><span class="orbit-age">1m</span></button>
+        <details class="orbit-older"><summary>Older requests <span>1 · over 7 days</span></summary>
+          <button class="orbit-row waiting" type="button" data-session="payments"><span class="orbit-provider">Cl</span><span><span class="orbit-task">Migrate billing tables</span><span class="orbit-meta">Claude · payments · cloud-dev-03</span><span class="orbit-status">Permission needed</span></span><span class="orbit-age">13d</span></button>
+        </details>
+      </div>
+      <div class="orbit-divider"></div>
+      <div class="orbit-section">
+        <div class="orbit-section-label"><span>In motion</span><span>03</span></div>
+        <button class="orbit-row running" type="button" data-session="api"><span class="orbit-provider">Cx</span><span><span class="orbit-task">Untangle the API client</span><span class="orbit-meta">Codex · platform · Studio</span><span class="orbit-status">Running integration tests</span></span><span class="orbit-age">12s ago</span></button>
+        <button class="orbit-row running" type="button" data-session="docs"><span class="orbit-provider">Cl</span><span><span class="orbit-task">Write the migration guide</span><span class="orbit-meta">Claude · docs · cloud-dev-03</span><span class="orbit-status">Editing migration.md</span></span><span class="orbit-age">3s ago</span></button>
+        <button class="orbit-row running" type="button" data-session="search"><span class="orbit-provider">Cl</span><span><span class="orbit-task">Speed up search</span><span class="orbit-meta">Claude · web-app · This Mac</span><span class="orbit-status">Inspecting query plans</span></span><span class="orbit-age">8s ago</span></button>
+      </div>
+      <div class="orbit-divider"></div>
+      <div class="orbit-section">
+        <div class="orbit-section-label"><span>Ready to review</span><span>01</span></div>
+        <button class="orbit-row" type="button" data-session="fix"><span class="orbit-provider"><i data-lucide="check" aria-hidden="true"></i></span><span><span class="orbit-task">Fix the sidebar flicker</span><span class="orbit-meta">Codex · web-app · Studio</span><span class="orbit-status">Turn finished · 3 files changed</span></span><span class="orbit-age">2m ago</span></button>
+      </div>
+    </div>
+    <div class="orbit-detail" hidden aria-live="polite">
+      <button class="orbit-back" type="button"><i data-lucide="arrow-left" aria-hidden="true"></i>All sessions</button>
+      <div class="orbit-detail-kicker orbit-detail-state"></div><h2></h2><div class="orbit-detail-meta"></div><div class="orbit-message"></div><div class="orbit-source"></div><div class="orbit-detail-kicker">Recent activity</div><div class="orbit-events"></div>
+    </div>
+    <div class="orbit-footer"><span><i data-lucide="radio" aria-hidden="true"></i>Local + remote</span><span>Concept · sample sessions</span></div>
+  </div>
+  <script>
+    (()=>{
+      const root=document.getElementById('orbit-concept');
+      const list=root.querySelector('.orbit-list'),detail=root.querySelector('.orbit-detail');
+      const sessions={
+        payments:{state:'Permission needed · 13 days',title:'Migrate billing tables',meta:'Claude · payments · cloud-dev-03',message:'Ready to apply the migration to the development database. Waiting for permission to run the migration command.',events:[['13d','Requested permission'],['13d','Validated migration against schema'],['13d','Created migration file']]},
+        auth:{state:'Waiting for your answer',title:'Finish the sign-in flow',meta:'Codex · web-app · This Mac',message:'Should users return to the page they were on before signing in, or always land on the dashboard?',events:[['1m','Asked about redirect behavior'],['2m','Added session persistence'],['4m','Updated the sign-in form']]},
+        api:{state:'Working',title:'Untangle the API client',meta:'Codex · platform · Studio',message:'Consolidated retry handling. Running integration tests to check timeout behavior and authentication failures.',events:[['12s','Started integration tests'],['1m','Updated retry handling'],['3m','Removed duplicated request helpers']]},
+        docs:{state:'Working',title:'Write the migration guide',meta:'Claude · docs · cloud-dev-03',message:'Updating the guide with the new configuration format and a concrete before-and-after example.',events:[['3s','Editing migration.md'],['40s','Checked configuration examples'],['2m','Read the release notes']]},
+        search:{state:'Working',title:'Speed up search',meta:'Claude · web-app · This Mac',message:'Comparing query plans for the current search query and a candidate index. No performance improvement confirmed yet.',events:[['8s','Inspecting query plans'],['1m','Ran baseline query'],['3m','Read search implementation']]},
+        fix:{state:'Ready to review',title:'Fix the sidebar flicker',meta:'Codex · web-app · Studio',message:'The turn finished with changes to three files. The session reports that the sidebar now preserves its width during navigation and the component tests passed.',events:[['2m','Turn finished'],['3m','Component tests passed'],['5m','Updated sidebar layout']]}
+      };
+      root.querySelectorAll('[data-session]').forEach(button=>button.addEventListener('click',()=>{
+        const session=sessions[button.dataset.session];
+        detail.querySelector('.orbit-detail-state').textContent=session.state;
+        detail.querySelector('h2').textContent=session.title;
+        detail.querySelector('.orbit-detail-meta').textContent=session.meta;
+        detail.querySelector('.orbit-message').textContent=session.message;
+        detail.querySelector('.orbit-source').textContent=button.dataset.session==='auth'?'Live Codex thread · Source link unavailable in preview.':'Source link unavailable in preview.';
+        const events=detail.querySelector('.orbit-events');events.replaceChildren();
+        session.events.forEach(([age,text])=>{const row=document.createElement('div');row.className='orbit-event';const time=document.createElement('time');time.textContent=age;const label=document.createElement('span');label.textContent=text;row.append(time,label);events.append(row);});
+        list.hidden=true;detail.hidden=false;root.lastSessionButton=button;detail.querySelector('.orbit-back').focus();
+      }));
+      root.querySelector('.orbit-back').addEventListener('click',()=>{detail.hidden=true;list.hidden=false;root.lastSessionButton?.focus();});
+      const trigger=root.querySelector('.orbit-trigger'),popover=root.querySelector('.orbit-popover');
+      trigger.addEventListener('click',()=>{popover.hidden=!popover.hidden;trigger.setAttribute('aria-expanded',String(!popover.hidden));});
+      root.addEventListener('keydown',event=>{if(event.key==='Escape'){popover.hidden=true;trigger.setAttribute('aria-expanded','false');trigger.focus();}});
+      const design={accent:'Mint',compact:false};
+      function render(){root.classList.toggle('compact',design.compact);root.style.setProperty('--orbit-accent',design.accent==='Mint'?'light-dark(#276b59,#83dfbf)':design.accent==='Iris'?'light-dark(#6846b5,#baa1f5)':'light-dark(#306b9b,#8bcafa)');}
+      render();
+      if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:render});tweak.addSelect(design,'accent',{label:'Signal color',options:['Mint','Iris','Ice']});tweak.addToggle(design,'compact',{label:'Compact rows'});}
+    })();
+  </script>
+</div>
