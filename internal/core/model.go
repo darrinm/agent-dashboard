@@ -59,6 +59,9 @@ type Session struct {
 	RequestKey   string    `json:"requestKey,omitempty"`
 	RequestKind  string    `json:"requestKind,omitempty"`
 	HookAt       time.Time `json:"hookAt"`
+	// notWaitingAt is the time from which a non-hook source can vouch that the
+	// session isn't waiting. It resolves older hook-opened prompts; never stored or sent.
+	notWaitingAt time.Time
 }
 type Health struct {
 	ID        string    `json:"id"`
@@ -99,6 +102,12 @@ func Project(cwd string) string {
 	return filepath.Base(cwd)
 }
 func IsAttention(e *Episode) bool { return e != nil && e.Kind != "review" }
+
+// HookRequestPending reports whether a lifecycle hook opened the session's
+// current question or permission request and nothing has resolved it yet.
+func HookRequestPending(s Session) bool {
+	return (s.RequestKind == "question" || s.RequestKind == "permission") && strings.HasPrefix(s.RequestKey, "hook:")
+}
 func SortSessions(s []Session) {
 	sort.SliceStable(s, func(i, j int) bool {
 		a, b := s[i], s[j]

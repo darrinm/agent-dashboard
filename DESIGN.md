@@ -51,7 +51,7 @@ Use the dot-grid glyph from the Agent Tower exploration, which Darrin prefers: t
 
 - **Count.** Sessions with an open question, permission, or failure episode, including older requests; not individual questions, so one session with three questions contributes one. Hidden at zero. Amber, or red while any failure episode is unseen. Reserve two-digit width so the item doesn't shift, and show `99+` above that. If every counted episode comes from a stale source, the count dims.
 - **Order.** Failures, then questions and permissions, then working sessions; newest episode first within each, matching the panel. Dots keep their positions until the set of active sessions changes.
-- **Overflow and coverage.** With more than nine active sessions, the last slot shows a small plus and the panel carries the full list. When any source stops reporting, the last slot shows a short dash instead, and the panel header names the source. The count is exact; the grid is a glance signal.
+- **Overflow and coverage.** With more than nine active sessions, the last slot shows a small plus and the panel carries the full list. When any source stops reporting, the last slot shows a short dash instead, and the panel header names the source. A permanently limited source, such as Codex's read-only fallback, is described in the panel header and never shows the dash. The count is exact; the grid is a glance signal.
 - **Inactive sessions.** Idle, ended, and ready-to-review sessions don't take slots. With nothing active, the grid shows nine dim dots so the item keeps its shape.
 - **Without color.** The count alone answers whether anything needs you. With Differentiate Without Color on, failures draw as squares, requests as filled circles, and working sessions as rings. The accessible label states every part, for example “6 sessions need you, 1 failed, 3 working, remote collector not reporting.” A source that was never supported, such as account-wide Claude discovery today, is described in the panel rather than marked with the coverage dash.
 
@@ -70,7 +70,7 @@ Tested September 10, 2026 on macOS 26.6.2 with a Studio Display (main) and an LG
 
 Start around 412 points wide, anchored to the menu bar item. Height grows to a screen-aware cap; longer lists scroll inside the panel. Keep essential navigation visible. The default ordering is:
 
-1. **Needs you:** questions, permission requests, and actionable terminal failures, newest attention episode first. Requests older than seven days appear in a collapsed **Older requests** group within this section, ordered newest first. Keep its unresolved count visible and included in the menu bar count; search includes it. Opening it reviews the requests rather than stopping their sessions.
+1. **Needs you:** questions, permission requests, and actionable terminal failures, newest attention episode first. The three newest requests always show in full, whatever their age, so a backlog of old requests is never hidden entirely. Beyond those, requests older than seven days fold into a collapsed **Older requests** group within this section, ordered newest first. Keep its unresolved count visible and included in the menu bar count; search includes it. Opening it reviews the requests rather than stopping their sessions.
 2. **Working:** sessions with observed active turns, with stable ordering while the user interacts.
 3. **Ready to review:** completed turns with output the user has not acknowledged.
 4. **Idle and disconnected:** collapsed when there are many, with a visible count and last-contact information.
@@ -225,9 +225,11 @@ Coverage has two independent dimensions: what the adapter can observe and what i
 
 Use `claude agents --json` as the initial inventory and reconciliation input. The reviewer confirmed that it reports `blocked`, `working`, and `done` for background sessions already running on this Mac. Enrich with session files and incrementally read transcripts. Hooks improve event timing for sessions that have loaded them; they are not a prerequisite for adopting weeks-old sessions.
 
-The documented lifecycle includes session start/end, prompt submission, tool events, notifications, and turn-stop events. Hook context can identify the session. A `Stop` event means the assistant finished responding; it does not establish task success. An individual tool failure need not mean the turn failed. [Claude Code hook reference](https://code.claude.com/docs/en/hooks).
+The documented lifecycle includes session start/end, prompt submission, tool events, notifications, and turn-stop events. Hook context can identify the session. A `Stop` event means the assistant finished responding; it does not establish task success. `SessionStart` also fires on resume, `/clear`, and `/compact`, so it never marks a session working. Claude records a user interrupt as a user text line beginning “[Request interrupted by user”, which ends the turn. An individual tool failure need not mean the turn failed. [Claude Code hook reference](https://code.claude.com/docs/en/hooks).
 
 Reported transcript error signals include `isApiErrorMessage` and `model_refusal_no_fallback`. Treat them as evidence for the relevant turn, then check for subsequent recovery or activity before opening a failure episode. A transcript's last timestamp may be an informational system entry; it cannot establish when a request began. Preserve a directly observed transition time when available, otherwise record an inferred time and its evidence.
+
+A hook-opened prompt stays pending until newer transcript activity resolves it, but after approval a long tool run writes nothing until it finishes. An inventory taken well after the prompt (initially five seconds) that reports the session working also resolves it. Tool-use and prompt hooks don't force an inventory; lifecycle and prompt events do, at most every three seconds.
 
 Notification hooks can indicate waiting for input or permission. Their timing and host behavior vary, so the adapter must identify the notification type and avoid treating every notification as a pending approval. [Claude Code hook guide](https://code.claude.com/docs/en/hooks-guide).
 
@@ -237,7 +239,7 @@ Optional OpenTelemetry integration can enrich usage and diagnostics. It is not a
 
 The documented App Server includes thread listing and reading, thread-status notifications, turn and item events, and methods to start, steer, and interrupt turns. These establish an integration path for threads available through the connected server; they do not by themselves establish visibility into every independently running Codex process. [Codex App Server](https://developers.openai.com/codex/app-server).
 
-The first spike must determine how the installed desktop app and CLI expose existing sessions. Read-only logs or databases may provide partial history if no supported live interface is available. Treat such formats as version-sensitive fallbacks: isolate them behind adapters, open read-only, tolerate concurrent writes, and report unknown status when evidence is insufficient. Do not hardcode a database filename from a mockup as the product contract. Never resume, archive, or mutate threads merely to discover them.
+The first spike must determine how the installed desktop app and CLI expose existing sessions. Read-only logs or databases may provide partial history if no supported live interface is available. Codex writes no completion when its process dies mid-turn, so a turn with no recorded activity for 30 minutes (six hours while a tool call is open) is no longer counted as working. Treat such formats as version-sensitive fallbacks: isolate them behind adapters, open read-only, tolerate concurrent writes, and report unknown status when evidence is insufficient. Do not hardcode a database filename from a mockup as the product contract. Never resume, archive, or mutate threads merely to discover them.
 
 The reviewer reports that Codex Desktop runs `codex app-server --listen` and that `codex agents` describes a shared local App Server daemon. This is evidence to test the existing daemon first, not proof that a newly launched server can subscribe to every live thread. Compare discovery, history, live status, and event subscription separately for Desktop and CLI sessions.
 
@@ -272,7 +274,7 @@ Source: the Agent Tower review, reporting Claude Code 2.1.267 and Codex 0.153.4 
 
 ### Efficient file ingestion
 
-The reviewer measured a 55 MB transcript and roughly 3.6 GB across Claude and Codex session folders. Do not parse all history at startup. Watch relevant directories, keep byte offsets, and read a bounded tail on first contact, initially 512 KB. Preserve partial JSONL records across reads; detect replacement, truncation, and rotation. If a tail lacks the state-establishing event, consult the inventory or a bounded earlier read and retain unknown fields rather than guessing. Include old sessions that are still live even when their files have not changed recently. Treat file watches as hints and reconcile periodically, initially every 15 seconds.
+The reviewer measured a 55 MB transcript and roughly 3.6 GB across Claude and Codex session folders. Do not parse all history at startup. Watch relevant directories, keep byte offsets, and read a bounded tail on first contact, initially 512 KB. Preserve partial JSONL records across reads; detect replacement, truncation, and rotation. If a tail lacks the state-establishing event, consult the inventory or a bounded earlier read and retain unknown fields rather than guessing. Include old sessions that are still live even when their files have not changed recently. Treat file watches as hints and reconcile periodically, initially every 15 seconds. Ignore file events that cannot change session state: Codex writes its logs database continuously, and reacting to it would rescan every source about once a second.
 
 ### Hook and notification configuration
 
@@ -331,7 +333,7 @@ Project file changes need attribution. A Git working-tree diff shared by two age
 
 ## 8. Delivery and failure behavior
 
-Use at-least-once event delivery. The collector assigns durable IDs and stores events before sending; the hub acknowledges only after durable ingestion. Duplicate delivery does not create duplicate history or notifications.
+Use at-least-once event delivery. A collector that isn't paired with a hub keeps no outbox, because pairing exports the current projection. A paired collector assigns durable IDs and stores events before sending; the hub acknowledges only after durable ingestion. Duplicate delivery does not create duplicate history or notifications. Before each batch, the outbox keeps only the newest unsent event per session: the hub ignores older sequences, and replaying days of superseded events after a reconnect would present stale requests as current.
 
 Order events within a source stream using its generation and sequence. Use timestamps for display, not as the sole ordering authority across machines with clock skew. A delayed old turn event must not regress a newer turn's state. Reconcile disagreements using provenance, source cursors, and turn identity; mark uncertainty rather than fabricate a total order between unrelated streams.
 
@@ -387,6 +389,8 @@ Deliver a compatibility matrix with provider versions, source surfaces, capabili
 Ship the native status item, local collector, attention inbox, detail view, cached history, source navigation, and deduplicated notifications. Support existing-session adoption to the extent proven in Phase 0. Include setup, diagnostics, and reversible hook installation that preserves existing configuration.
 
 Exit criterion: use it for a full working day with both providers; every tested attention transition is represented correctly, collection survives restart, and missing coverage is visible.
+
+Record accuracy during that day from the panel. Each expanded session has a **Wrong state?** menu that appends the session's full local projection, source health, and the verdict (not actually waiting, waiting but not shown, or other) to `feedback.jsonl` in the private data directory. `agents-collector feedback-report` counts false positives and misses by provider and lists the latest reports. The file contains session text and stays on the machine.
 
 Hooks, completion-handler preservation, and error/recovery classification belong in this phase rather than a later accuracy milestone. Evaluate the six reported old requests without requiring their sessions to restart. Verify that newer requests remain easy to find while old requests stay counted and reviewable.
 

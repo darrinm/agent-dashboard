@@ -25,6 +25,37 @@ final class AcknowledgmentProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+func checkDateParsing() {
+    let formatter=ISO8601DateFormatter();formatter.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
+    for text in ["2026-09-10T22:38:39.123456789Z","2026-09-10T22:38:39Z","2024-02-29T23:59:59.5Z","1970-01-01T00:00:00Z","2000-03-01T00:00:00.000001Z"] {
+        let expected=formatter.date(from:text) ?? ISO8601DateFormatter().date(from:text)!
+        guard let parsed=JSON.parseUTCDate(text) else {preconditionFailure("fast parser rejected \(text)")}
+        precondition(abs(parsed.timeIntervalSince1970-expected.timeIntervalSince1970)<0.001,"fast parser mismatch for \(text)")
+    }
+    precondition(JSON.parseUTCDate("2026-09-10T22:38:39+02:00")==nil,"offsets must fall back to the formatter")
+    precondition(JSON.parseUTCDate("0001-01-01T00:00:00Z")?.timeIntervalSince1970 == -62135596800,"Go's zero time must match Go's calendar")
+}
+
+@MainActor func checkPanelGrouping() {
+    let now=Date()
+    func session(_ id:String,daysOld:Double?,parent:String?=nil,working:Bool=false)->AgentSession {
+        let attention=daysOld.map{Attention(id:"e-"+id,kind:"question",openedAt:now.addingTimeInterval(-$0*86400),seen:false,notified:false,snoozedUntil:.distantPast)}
+        return AgentSession(id:id,nativeID:id,machineID:"m",machine:"Mac",provider:"codex",source:"codex",kind:parent==nil ? "cli":"subagent",title:id,project:"p",cwd:nil,branch:nil,parentID:parent,aliases:[],execution:working ? "working":"idle",outcome:"unknown",connectivity:"online",evidence:"inferred",attention:attention,lastActivity:now,stateSince:now,observedAt:now,summary:"",capabilities:[],transcript:nil,attachID:nil,buckets:[],hasActivity:false,openTools:0,remote:false)
+    }
+    // Six requests, all older than seven days: the three newest stay visible.
+    let old=(0..<6).map{session("old\($0)",daysOld:13+Double($0))}
+    let allOld=partitionRequests(old)
+    precondition(allOld.shown.map(\.id)==["old0","old1","old2"],"newest old requests were folded")
+    precondition(allOld.folded.map(\.id)==["old3","old4","old5"],"older requests were not folded")
+    // Recent requests are never folded, and older ones fold behind them.
+    let mixed=partitionRequests([session("recent0",daysOld:1),session("recent1",daysOld:2),session("recent2",daysOld:3),session("recent3",daysOld:4)]+old)
+    precondition(mixed.shown.count==4 && mixed.folded.count==6,"recent requests must stay visible")
+    // Idle subagents nest under a present parent; active or orphaned ones stay listed.
+    let groups=nesting([session("parent",daysOld:nil),session("idleChild",daysOld:nil,parent:"parent"),session("workingChild",daysOld:nil,parent:"parent",working:true),session("orphan",daysOld:nil,parent:"missing")])
+    precondition(groups.nested==["idleChild"],"nesting hid the wrong sessions: \(groups.nested)")
+    precondition(groups.counts["parent"]==2,"parent subagent count wrong")
+}
+
 @main struct AcknowledgmentTests {
     @MainActor static func settled(_ model: AgentModel) async throws {
         for _ in 0..<200 {
@@ -34,6 +65,8 @@ final class AcknowledgmentProtocol: URLProtocol {
         preconditionFailure("Acknowledgment did not finish")
     }
     @MainActor static func main() async throws {
+        checkDateParsing()
+        checkPanelGrouping()
         UserDefaults.standard.setVolatileDomain(["notificationsEnabled": false], forName: UserDefaults.argumentDomain)
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -91,6 +124,6 @@ final class AcknowledgmentProtocol: URLProtocol {
         m.acknowledge(old, "seen")
         try await settled(m)
         precondition(m.actionError == nil && AcknowledgmentProtocol.recordedRequests().count == 1)
-        print("Acknowledgment checks passed: stale episodes refresh without replay, passive failures stay silent, manual failures report, and old snapshots cannot regress state.")
+        print("Acknowledgment checks passed: stale episodes refresh without replay, passive failures stay silent, manual failures report, old snapshots cannot regress state, the newest requests stay visible, idle subagents nest under their parent, and collector dates parse without a formatter.")
     }
 }

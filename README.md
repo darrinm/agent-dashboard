@@ -9,21 +9,31 @@ make build
 open dist/Agents.app --args --show
 ```
 
-Requires macOS 26, Xcode command-line tools and Go 1.24 or newer. The first build downloads Go dependencies. The resulting app is locally signed and contains its collector; it does not require Go to run. For regular use, copy `dist/Agents.app` to `/Applications` before enabling login launch or installing lifecycle hooks. A Developer ID and notarization are needed for distribution to other Macs.
+Requires macOS 26, Xcode command-line tools and Go 1.24 or newer. The first build downloads Go dependencies. The build signs the app with your Apple Development or Developer ID identity when one is available (override with `AGENTS_SIGN_IDENTITY`), so Keychain access and permissions survive rebuilds; without one it signs ad hoc. The app contains its collector and does not require Go to run. For regular use, copy `dist/Agents.app` to `/Applications` before enabling login launch or installing lifecycle hooks. A Developer ID and notarization are needed for distribution to other Macs.
 
 Click the dot grid or press **Option–Space**. Search by session, project, provider or machine; use the arrow keys and Return to expand or collapse a session in place, and Escape to collapse expanded sessions or close. Several sessions can stay expanded. Group headers toggle across the whole row. Settings offers alternate shortcuts, appearance, notifications, login launch and hub pairing.
 
 The **?** button in the panel and **Setup & Help** in Settings open a native, searchable guide. Its nine topics and copyable setup commands are bundled inside the app and work offline. Recipients do not need this repository to read installation, hook, remote-machine, hub, privacy or troubleshooting instructions.
 
-The count includes older unresolved requests, which are folded into **Older requests** after seven days. Viewing a visible row acknowledges the request without resolving it. Old imported requests do not blink or trigger a notification storm. Recently completed turns appear in **Ready to review** for 24 hours. Older output remains searchable in the idle group until retention expires.
+The count includes older unresolved requests. The three newest requests always stay visible; beyond those, requests older than seven days fold into **Older requests**. Idle Codex subagents appear as a count on their parent session and still match a search. Viewing a visible row acknowledges the request without resolving it. Old imported requests do not blink or trigger a notification storm. Recently completed turns appear in **Ready to review** for 24 hours. Older output remains searchable in the idle group until retention expires.
 
 Collection starts automatically and adopts sessions already running. It reads provider files without rewriting them. Claude background sessions expose **Attach in Ghostty** where the inventory supports it. Codex offers project and transcript navigation; it never launches `codex resume` to impersonate focusing a live thread.
 
 The app stops a collector it launched when it quits. A separately started collector keeps running. If another collector owns the data directory, the app connects to it.
 
+## Reporting wrong states
+
+If a session shows the wrong state, expand it and choose **Wrong state?**. Agents appends the verdict, the session's full local projection and source health to `feedback.jsonl` in its data directory. Summarize the reports with:
+
+```sh
+dist/Agents.app/Contents/Resources/agents-collector feedback-report
+```
+
+The file contains session text. It is never uploaded.
+
 ## Optional lifecycle hooks
 
-Existing sessions are discovered without installing hooks. In Settings, **Enable live lifecycle hooks** adds Claude events and wraps Codex's existing `notify` command. Provider startup behavior determines whether an existing session adopts new hooks.
+Existing sessions are discovered without installing hooks, but without them a Claude permission prompt in an interactive session looks like a running tool: only hooks report the prompt itself. In Settings, **Enable live lifecycle hooks** adds Claude events and wraps Codex's existing `notify` command. Provider startup behavior determines whether an existing session adopts new hooks.
 
 Preview from the terminal, then apply if desired:
 
@@ -32,7 +42,7 @@ dist/Agents.app/Contents/Resources/agents-collector hooks-install
 dist/Agents.app/Contents/Resources/agents-collector hooks-install --apply
 ```
 
-Remove with `hooks-remove --apply`, or the Settings button. The installer preserves unrelated hooks and TOML configuration, records the existing notify command, and forwards its original arguments. Keep the app at the installation path used when enabling hooks; remove and reinstall the hooks after moving it. Hook installation was tested against temporary fixture configurations; this implementation run did not modify your live Claude or Codex settings.
+Remove with `hooks-remove --apply`, or the Settings button. The installer preserves unrelated hooks and TOML configuration, records the existing notify command, and forwards its original arguments. After moving the app, enable hooks again from its new location: Agents recognizes its earlier entries by data directory and replaces them. Hook installation was tested against temporary fixture configurations; this implementation run did not modify your live Claude or Codex settings.
 
 ## Other machines and cloud VMs
 

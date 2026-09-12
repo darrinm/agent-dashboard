@@ -28,7 +28,35 @@ struct CollectorEndpoint: Codable { var url: String; var token: String; var pid:
 enum JSON {
     static let fractional: ISO8601DateFormatter = { let f=ISO8601DateFormatter(); f.formatOptions=[.withInternetDateTime,.withFractionalSeconds];return f }()
     static let plain=ISO8601DateFormatter()
-    static func decoder() -> JSONDecoder { let d=JSONDecoder(); d.dateDecodingStrategy = .custom { decoder in let c=try decoder.singleValueContainer();let s=try c.decode(String.self);if let date=fractional.date(from:s) ?? plain.date(from:s){return date};throw DecodingError.dataCorruptedError(in:c,debugDescription:"Invalid date") };return d }
+    // Snapshots carry hundreds of dates and arrive often; ISO8601DateFormatter costs about 30 µs per
+    // date, so the collector's UTC format is parsed directly and the formatters are only a fallback.
+    static func decoder() -> JSONDecoder { let d=JSONDecoder(); d.dateDecodingStrategy = .custom { decoder in let c=try decoder.singleValueContainer();let s=try c.decode(String.self);if let date=parseUTCDate(s) ?? fractional.date(from:s) ?? plain.date(from:s){return date};throw DecodingError.dataCorruptedError(in:c,debugDescription:"Invalid date") };return d }
+    /// Parses "2026-09-10T22:38:39.123456789Z" (RFC 3339 in UTC, as Go writes it) using the proleptic Gregorian calendar.
+    static func parseUTCDate(_ s: String) -> Date? {
+        var utf8 = s.utf8.makeIterator()
+        func digits(_ n: Int) -> Int? {
+            var v = 0
+            for _ in 0..<n { guard let c = utf8.next(), c >= 48, c <= 57 else { return nil }; v = v * 10 + Int(c - 48) }
+            return v
+        }
+        func expect(_ ch: UInt8) -> Bool { utf8.next() == ch }
+        guard let year = digits(4), expect(45), let month = digits(2), expect(45), let day = digits(2), expect(84),
+              let hour = digits(2), expect(58), let minute = digits(2), expect(58), let second = digits(2) else { return nil }
+        var fraction = 0.0, scale = 0.1
+        var next = utf8.next()
+        if next == 46 {
+            next = utf8.next()
+            while let c = next, c >= 48, c <= 57 { fraction += Double(c - 48) * scale; scale /= 10; next = utf8.next() }
+        }
+        guard next == 90, utf8.next() == nil else { return nil }
+        // Days from civil date (Howard Hinnant's algorithm).
+        let y = month <= 2 ? year - 1 : year
+        let era = (y >= 0 ? y : y - 399) / 400
+        let yoe = y - era * 400
+        let doy = (153 * (month > 2 ? month - 3 : month + 9) + 2) / 5 + day - 1
+        let days = era * 146097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719468
+        return Date(timeIntervalSince1970: Double(days * 86400 + hour * 3600 + minute * 60 + second) + fraction)
+    }
     static func encoder() -> JSONEncoder { let e=JSONEncoder();e.dateEncodingStrategy = .iso8601;return e }
 }
 enum Palette {
@@ -38,8 +66,28 @@ enum Palette {
 }
 func age(_ date: Date) -> String { let seconds=max(0,Int(Date().timeIntervalSince(date)));if seconds>86400{return "\(seconds/86400)d"};if seconds>3600{return "\(seconds/3600)h"};if seconds>60{return "\(seconds/60)m"};return "\(seconds)s" }
 
+/// Needs-you requests shown in full regardless of age. Beyond these, requests
+/// older than seven days fold into the Older requests group.
+let alwaysShownRequests=3
+func newestRequestFirst(_ a:AgentSession,_ b:AgentSession)->Bool { (a.attention?.openedAt ?? .distantPast) > (b.attention?.openedAt ?? .distantPast) }
+func partitionRequests(_ needs:[AgentSession]) -> (shown:[AgentSession],folded:[AgentSession]) {
+    let sorted=needs.sorted(by:newestRequestFirst)
+    var shown:[AgentSession]=[],folded:[AgentSession]=[]
+    for (index,s) in sorted.enumerated() { if s.older && index>=alwaysShownRequests {folded.append(s)} else {shown.append(s)} }
+    return (shown,folded)
+}
+/// Subagents nest under a parent that is present, unless they need you or are working.
+func nesting(_ sessions:[AgentSession]) -> (nested:Set<String>,counts:[String:Int]) {
+    let ids=Set(sessions.map(\.id))
+    var nested=Set<String>(),counts:[String:Int]=[:]
+    for s in sessions { guard let parent=s.parentID,ids.contains(parent) else{continue}; counts[parent,default:0]+=1; if !s.active{nested.insert(s.id)} }
+    return (nested,counts)
+}
+
 @MainActor final class AgentModel: ObservableObject {
-    @Published var sessions: [AgentSession]=[]
+    @Published var sessions: [AgentSession]=[] { didSet { (nestedIDs,subagentCounts)=nesting(sessions) } }
+    private(set) var nestedIDs=Set<String>()
+    private(set) var subagentCounts:[String:Int]=[:]
     @Published var sources: [SourceHealth]=[]
     @Published var connected=false
     @Published var message="Connecting to your sessions…"
@@ -62,13 +110,17 @@ func age(_ date: Date) -> String { let seconds=max(0,Int(Date().timeIntervalSinc
     var seenPending=Set<String>()
     var notificationPending=Set<String>()
     var deliveredNotifications=Set<String>()
+    private var pendingCache:Snapshot?
+    private var lastCacheWrite=Date.distantPast
     @Published var panelVisible=false
     var machine="This Mac"
     init(dataDir: URL, network:URLSession = .shared) { self.dataDir=dataDir;self.network=network
         if let data=try? Data(contentsOf:dataDir.appendingPathComponent("ui-cache.json")),let s=try? JSON.decoder().decode(Snapshot.self,from:data){sessions=s.sessions;sources=s.sources;machine=s.machine}
+        (nestedIDs,subagentCounts)=nesting(sessions) // Observers don't run during init.
     }
-    var needs: [AgentSession] { sessions.filter(\.needsYou).sorted { ($0.attention?.openedAt ?? .distantPast) > ($1.attention?.openedAt ?? .distantPast) } }
-    var hasMissingSource: Bool { !connected || sources.contains { $0.status == "unavailable" || $0.status == "error" || $0.status == "degraded" } || sessions.contains { $0.active && $0.connectivity != "online" } }
+    var needs: [AgentSession] { sessions.filter(\.needsYou).sorted(by:newestRequestFirst) }
+    // A source that has stopped reporting. Permanent limits ("degraded", "unsupported") are described in the panel instead.
+    var hasMissingSource: Bool { !connected || sources.contains { $0.status == "unavailable" || $0.status == "error" } || sessions.contains { $0.active && $0.connectivity != "online" } }
     func start() { streamTask?.cancel();streamTask=Task { while !Task.isCancelled { do {
         let data=try Data(contentsOf:dataDir.appendingPathComponent("collector.json"));let e=try JSON.decoder().decode(CollectorEndpoint.self,from:data);endpoint=e
         guard let url=URL(string:e.url+"/v1/events") else { throw URLError(.badURL) };var request=URLRequest(url:url);request.setValue("Bearer \(e.token)",forHTTPHeaderField:"Authorization");request.timeoutInterval=3600
@@ -82,8 +134,17 @@ func age(_ date: Date) -> String { let seconds=max(0,Int(Date().timeIntervalSinc
         lastSequence=snapshot.sequence;snapshotRevision+=1
         sessions=snapshot.sessions;sources=snapshot.sources;connected=true;machine=snapshot.machine;message="Connected";onUpdate?()
         deliveredNotifications.formIntersection(Set(sessions.compactMap{$0.attention?.id}))
-        if let data=try? JSON.encoder().encode(snapshot) {let file=dataDir.appendingPathComponent("ui-cache.json");try? data.write(to:file,options:.atomic);try? FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:file.path)}
+        pendingCache=snapshot
+        if Date().timeIntervalSince(lastCacheWrite)>=60 {writeCache()}
         checkNotifications()
+    }
+    /// The cache only speeds up the next launch, so it is written at most once a minute and on quit.
+    func writeCache() {
+        guard let snapshot=pendingCache,let data=try? JSON.encoder().encode(snapshot) else{return}
+        let file=dataDir.appendingPathComponent("ui-cache.json")
+        try? data.write(to:file,options:.atomic)
+        try? FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:file.path)
+        pendingCache=nil;lastCacheWrite=Date()
     }
     func launchCollectorIfNeeded() {
         if process?.isRunning == true{return}
@@ -94,20 +155,15 @@ func age(_ date: Date) -> String { let seconds=max(0,Int(Date().timeIntervalSinc
     }
     func findCLI(_ name: String) -> String { let home=FileManager.default.homeDirectoryForCurrentUser.path;let candidates=["\(home)/.local/bin/\(name)","\(home)/.bun/bin/\(name)","/opt/homebrew/bin/\(name)","/usr/local/bin/\(name)"];return candidates.first {FileManager.default.isExecutableFile(atPath:$0)} ?? name }
     func acknowledge(_ s: AgentSession,_ action: String) {
-        guard let e=s.attention,let endpoint=endpoint,let url=URL(string:endpoint.url+"/v1/attention") else{return}
+        guard let e=s.attention,let endpoint=endpoint else{return}
         let marker=e.id+action;if seenPending.contains(marker){return};seenPending.insert(marker)
         let automatic=action=="seen" || action=="notified"
         if action=="notified"{deliveredNotifications.insert(e.id)}
         Task {
             defer {seenPending.remove(marker)}
-            var req=URLRequest(url:url);req.httpMethod="POST";req.timeoutInterval=8
-            req.setValue("Bearer \(endpoint.token)",forHTTPHeaderField:"Authorization")
-            req.setValue("application/json",forHTTPHeaderField:"Content-Type")
-            req.httpBody=try? JSONSerialization.data(withJSONObject:["sessionID":s.id,"episodeID":e.id,"action":action])
             do {
-                let (_,res)=try await network.data(for:req)
+                let status=try await post("/v1/attention",["sessionID":s.id,"episodeID":e.id,"action":action],to:endpoint)
                 guard self.endpoint?.token==endpoint.token else{return}
-                let status=(res as? HTTPURLResponse)?.statusCode ?? 0
                 if status==200{return}
                 if status==409 {
                     // The old episode is gone. Fetch current state without
@@ -125,6 +181,16 @@ func age(_ date: Date) -> String { let seconds=max(0,Int(Date().timeIntervalSinc
             }
         }
     }
+    /// Posts a JSON body to the collector and returns the HTTP status.
+    private func post(_ path:String,_ body:[String:Any],to endpoint:CollectorEndpoint) async throws -> Int {
+        guard let url=URL(string:endpoint.url+path) else {throw URLError(.badURL)}
+        var req=URLRequest(url:url);req.httpMethod="POST";req.timeoutInterval=8
+        req.setValue("Bearer \(endpoint.token)",forHTTPHeaderField:"Authorization")
+        req.setValue("application/json",forHTTPHeaderField:"Content-Type")
+        req.httpBody=try JSONSerialization.data(withJSONObject:body)
+        let (_,res)=try await network.data(for:req)
+        return (res as? HTTPURLResponse)?.statusCode ?? 0
+    }
     private func refreshSnapshot(from endpoint:CollectorEndpoint) async {
         guard let url=URL(string:endpoint.url+"/v1/sessions") else{return}
         let revision=snapshotRevision
@@ -140,7 +206,17 @@ func age(_ date: Date) -> String { let seconds=max(0,Int(Date().timeIntervalSinc
     func saw(_ s: AgentSession) {if panelVisible && s.attention?.seen == false && (s.needsYou || expandedIDs.contains(s.id)) {acknowledge(s,"seen")}}
     func toggleExpansion(_ s:AgentSession) {if expandedIDs.contains(s.id){expandedIDs.remove(s.id)}else{expandedIDs.insert(s.id);saw(s)}}
     func reviewVisible(_ s:AgentSession)->Bool {s.isReview || (expandedIDs.contains(s.id) && s.attention?.kind=="review" && Date().timeIntervalSince(s.attention!.openedAt)<86400)}
-    func reveal(_ s:AgentSession) {settings=false;search="";expandedIDs.insert(s.id);if s.older{showOlder=true};if !s.active && !reviewVisible(s){showIdle=true};revealID=s.id}
+    func reveal(_ s:AgentSession) {settings=false;search="";expandedIDs.insert(s.id);if partitionRequests(needs).folded.contains(where:{$0.id==s.id}){showOlder=true};if !s.active && !reviewVisible(s){showIdle=true};revealID=s.id}
+    func reportWrongState(_ s:AgentSession,verdict:String) {
+        guard let endpoint=endpoint else {actionError="Could not record that because the collector is unavailable.";return}
+        Task {
+            do {
+                let status=try await post("/v1/feedback",["sessionID":s.id,"verdict":verdict],to:endpoint)
+                if status==401 || status==403{start()}
+                actionError=status==200 ? "Recorded. The session’s current state and evidence were saved to feedback.jsonl for review." : "Could not record that. The collector returned an error (\(status))."
+            } catch {actionError="Could not record that because the collector is unavailable."}
+        }
+    }
     func checkNotifications() {
         guard UserDefaults.standard.bool(forKey:"notificationsEnabled") else{return}
         let eligible=sessions.filter{s in guard let e=s.attention else{return false};return !e.seen && !e.notified && (e.kind != "review" || UserDefaults.standard.bool(forKey:"completionNotifications")) && Date().timeIntervalSince(e.openedAt)>=20 && Date().timeIntervalSince(e.openedAt)<7*86400 && e.snoozedUntil<Date() && s.connectivity=="online" && !notificationPending.contains(e.id) && !deliveredNotifications.contains(e.id)}

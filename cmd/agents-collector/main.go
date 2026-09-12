@@ -77,6 +77,8 @@ func run() error {
 		return core.Enroll(ctx, o.DataDir, *hub, *token, o.Machine)
 	case "hub":
 		return core.RunHub(ctx, o)
+	case "feedback-report":
+		return core.FeedbackReport(o.DataDir, os.Stdout)
 	case "snapshot":
 		s, err := core.OpenStore(o.DataDir, o.Machine)
 		if err != nil {
