@@ -103,6 +103,28 @@ func (s *Store) Health(h Health) {
 		s.wake()
 	}
 }
+// ClearHealth removes a health entry that hasn't been reported again for at least
+// minAge, so a passed condition stays visible for a while before disappearing.
+func (s *Store) ClearHealth(id string, minAge time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if h, ok := s.health[id]; ok && time.Since(h.UpdatedAt) >= minAge {
+		delete(s.health, id)
+		s.wake()
+	}
+}
+// Sessions returns unsorted copies of the stored sessions that match.
+func (s *Store) Sessions(match func(Session) bool) []Session {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []Session
+	for _, v := range s.sessions {
+		if match(v) {
+			out = append(out, v)
+		}
+	}
+	return out
+}
 func (s *Store) Get(id string) (Session, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -137,9 +159,11 @@ func (s *Store) Apply(v Session) error {
 	if exists && v.ObservedAt.Before(old.ObservedAt) {
 		return nil
 	}
-	// A snapshot cannot erase a pending hook request without newer turn activity.
-	// Conversely, later transcript activity resolves it even though hooks are a stronger source.
-	if !v.Remote && v.HookAt.IsZero() && !old.HookAt.IsZero() && v.LastActivity.Before(old.HookAt) {
+	// A write that isn't a newer hook cannot erase a pending hook request without
+	// newer evidence: turn activity, or a source vouching the session isn't waiting,
+	// after the hook. Other hook-derived state is not pinned.
+	if !v.Remote && !v.HookAt.After(old.HookAt) && HookRequestPending(old) &&
+		v.LastActivity.Before(old.HookAt) && !v.notWaitingAt.After(old.HookAt) {
 		v.RequestKind, v.RequestKey = old.RequestKind, old.RequestKey
 		v.Execution, v.Outcome = old.Execution, old.Outcome
 		v.HookAt, v.StateSince, v.Summary = old.HookAt, old.StateSince, old.Summary
@@ -189,15 +213,21 @@ func (s *Store) Apply(v Session) error {
 	if _, err = tx.Exec("INSERT INTO sessions VALUES(?,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body", v.ID, b); err != nil {
 		return err
 	}
-	sent := 0
-	if v.Remote {
-		sent = 1
+	seq := s.seq + 1
+	// Only a paired collector keeps an outbox. Pairing exports the current
+	// projection, so events recorded before pairing would never be needed.
+	if v.Remote || s.remoteConfigured() {
+		sent := 0
+		if v.Remote {
+			sent = 1
+		}
+		r, err := tx.Exec("INSERT INTO events(at,session_id,body,sent) VALUES(?,?,?,?)", time.Now().Unix(), v.ID, b, sent)
+		if err != nil {
+			return err
+		}
+		id, _ := r.LastInsertId()
+		seq = max(seq, id)
 	}
-	r, err := tx.Exec("INSERT INTO events(at,session_id,body,sent) VALUES(?,?,?,?)", time.Now().Unix(), v.ID, b, sent)
-	if err != nil {
-		return err
-	}
-	seq, _ := r.LastInsertId()
 	if err = tx.Commit(); err != nil {
 		return err
 	}
@@ -244,15 +274,31 @@ func (s *Store) LoadTail(path string, into any) bool {
 func (s *Store) SaveTail(path string, v any) {
 	_, _ = s.DB.Exec("INSERT INTO tail_state VALUES(?,?) ON CONFLICT(path) DO UPDATE SET body=excluded.body", path, wireJSON(v))
 }
+func (s *Store) remoteConfigured() bool {
+	_, err := os.Stat(filepath.Join(s.DataDir, "remote.json"))
+	return err == nil
+}
 func (s *Store) Prune() error {
+	configured := s.remoteConfigured()
+	if !configured {
+		// An unpaired collector has no use for queued events.
+		r, err := s.DB.Exec("DELETE FROM events WHERE sent=0")
+		if err != nil {
+			return err
+		}
+		if n, _ := r.RowsAffected(); n > 1000 {
+			_, _ = s.DB.Exec("VACUUM")
+		}
+	}
 	// Keep the pending queue bounded. Dropped entries are surfaced, never silently replayed.
 	var size int64
-	_, configured := os.Stat(filepath.Join(s.DataDir, "remote.json"))
 	_ = s.DB.QueryRow("SELECT COALESCE(SUM(length(body)),0) FROM events WHERE sent=0").Scan(&size)
+	gap := false
 	if size > 100*1024*1024 {
+		gap = true
 		_, err := s.DB.Exec(`DELETE FROM events WHERE seq IN (
 SELECT seq FROM (SELECT seq,SUM(length(body)) OVER (ORDER BY seq DESC) AS cumulative FROM events WHERE sent=0) WHERE cumulative>?)`, 100*1024*1024)
-		if configured == nil {
+		if configured {
 			s.Health(Health{ID: "outbox", Name: "Remote delivery", Status: "degraded", Detail: "History gap: local outbox reached its size limit"})
 		}
 		if err != nil {
@@ -261,8 +307,12 @@ SELECT seq FROM (SELECT seq,SUM(length(body)) OVER (ORDER BY seq DESC) AS cumula
 	}
 	var pending int
 	_ = s.DB.QueryRow("SELECT count(*) FROM events WHERE sent=0 AND at<?", time.Now().Add(-7*24*time.Hour).Unix()).Scan(&pending)
-	if pending > 0 && configured == nil {
+	if pending > 0 && configured {
+		gap = true
 		s.Health(Health{ID: "outbox", Name: "Remote delivery", Status: "degraded", Detail: "History gap: unsent events exceeded seven-day retention"})
+	}
+	if !gap {
+		s.ClearHealth("outbox", time.Hour)
 	}
 	_, err := s.DB.Exec("DELETE FROM events WHERE at<?", time.Now().Add(-7*24*time.Hour).Unix())
 	if err != nil {

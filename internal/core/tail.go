@@ -201,9 +201,16 @@ func (t *Tail) Parse(d map[string]any, provider string) {
 		if typ == "user" && !isToolResult {
 			t.LastUser = at
 			t.LastTurn = at
-			t.Execution = "working"
-			t.Outcome = "unknown"
 			t.clearRequest()
+			if interruptedByUser(texts) {
+				// Claude records an interrupt as a user text line; the turn has stopped.
+				t.closeTools(at)
+				t.Execution = "idle"
+				t.Outcome = "interrupted"
+			} else {
+				t.Execution = "working"
+				t.Outcome = "unknown"
+			}
 		}
 		if typ == "assistant" {
 			t.LastTurn = at
@@ -338,6 +345,14 @@ func (t *Tail) closeTools(at time.Time) {
 			t.Tools[id] = span
 		}
 	}
+}
+func interruptedByUser(texts []string) bool {
+	for _, text := range texts {
+		if strings.HasPrefix(strings.TrimSpace(text), "[Request interrupted by user") {
+			return true
+		}
+	}
+	return false
 }
 func (t *Tail) Buckets(now time.Time) ([]Bucket, int) {
 	start := now.UTC().Truncate(30 * time.Second).Add(-29 * 30 * time.Second)

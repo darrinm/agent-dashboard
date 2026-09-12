@@ -62,7 +62,7 @@ final class AgentPanel:NSPanel {override var canBecomeKey:Bool {true}}
         item=NSStatusBar.system.statusItem(withLength:61);item.button?.target=self;item.button?.action=#selector(togglePanel)
         panel=AgentPanel(contentRect:NSRect(x:0,y:0,width:412,height:600),styleMask:[.borderless,.nonactivatingPanel],backing:.buffered,defer:false)
         panel.isFloatingPanel=true;panel.level = .statusBar;panel.hasShadow=true;panel.backgroundColor = .clear;panel.isOpaque=false;panel.hidesOnDeactivate=false;panel.collectionBehavior=[.canJoinAllSpaces,.fullScreenAuxiliary];panel.isReleasedWhenClosed=false
-        panel.contentView=NSHostingView(rootView:PanelView(model:model))
+        // The panel's SwiftUI content exists only while it's open (see showPanel/closePanel).
         model.onUpdate={ [weak self] in self?.updateGlyph() }
         registerHotKey()
         observers.append(NotificationCenter.default.addObserver(forName:Notification.Name("AgentsShortcutChanged"),object:nil,queue:.main){[weak self] _ in Task{@MainActor in self?.registerHotKey()}})
@@ -100,9 +100,15 @@ final class AgentPanel:NSPanel {override var canBecomeKey:Bool {true}}
         let height=floor(visible.height * 0.75);let width:CGFloat=412
         let top=min(anchor.minY,visible.maxY)-2
         panel.setFrame(NSRect(x:max(visible.minX+8,min(anchor.maxX-width,visible.maxX-width-8)),y:max(visible.minY+8,top-height),width:width,height:height),display:true)
-        model.panelVisible=true;panel.makeKeyAndOrderFront(nil);NSApp.activate(ignoringOtherApps:true);NotificationCenter.default.post(name:Notification.Name("AgentsPanelOpened"),object:nil)
+        // Build the view tree only while the panel is visible, so session updates
+        // cause no SwiftUI work when it's closed.
+        if !(panel.contentView is NSHostingView<PanelView>) {panel.contentView=NSHostingView(rootView:PanelView(model:model))}
+        model.panelVisible=true;panel.makeKeyAndOrderFront(nil);NSApp.activate(ignoringOtherApps:true)
     }
-    func closePanel(){panel.orderOut(nil);model.panelVisible=false}
+    func closePanel(){
+        guard panel.isVisible || panel.contentView is NSHostingView<PanelView> else{return}
+        panel.orderOut(nil);model.panelVisible=false;panel.contentView=nil
+    }
     @objc func showHelp(){
         closePanel()
         if helpWindow==nil {
@@ -129,7 +135,7 @@ final class AgentPanel:NSPanel {override var canBecomeKey:Bool {true}}
         help.addItem(withTitle:"Agents Setup & Help",action:#selector(showHelp),keyEquivalent:"?").target=self
         NSApp.mainMenu=menu;NSApp.helpMenu=help;NSApp.windowsMenu=windowMenu
     }
-    func applicationWillTerminate(_ notification:Notification){model?.streamTask?.cancel();model?.process?.terminate()}
+    func applicationWillTerminate(_ notification:Notification){model?.writeCache();model?.streamTask?.cancel();model?.process?.terminate()}
     func updateGlyph(){
         guard let button=item.button,model != nil else{return}
         let active=model.sessions.filter(\.active).sorted{a,b in let ar=a.attention?.kind=="failure" ? 0:a.needsYou ? 1:2;let br=b.attention?.kind=="failure" ? 0:b.needsYou ? 1:2;return ar==br ? (a.attention?.openedAt ?? a.lastActivity) > (b.attention?.openedAt ?? b.lastActivity):ar<br}

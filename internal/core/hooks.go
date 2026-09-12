@@ -17,9 +17,9 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
+// HookBackup records Codex's notify setting from before Agents wrapped it.
 type HookBackup struct {
 	Notify    []string `json:"notify"`
-	Wrapper   []string `json:"wrapper"`
 	HadNotify bool     `json:"hadNotify"`
 }
 
@@ -27,7 +27,16 @@ func quote(s string) string { return "'" + strings.ReplaceAll(s, "'", "'\"'\"'")
 func hookCommand(binary, dir string) string {
 	return quote(binary) + " hook claude --data-dir " + quote(dir)
 }
-func InstallHooks(home, dir, binary string, remove bool) error {
+
+// Ownership is recognized by data directory rather than binary path, so hooks
+// installed before the app moved are still found, replaced, and removed.
+func ownedClaudeHook(command, dir string) bool {
+	return strings.HasSuffix(command, " hook claude --data-dir "+quote(dir))
+}
+func ownedCodexWrapper(args []string, dir string) bool {
+	return len(args) == 5 && args[1] == "hook" && args[2] == "codex" && args[3] == "--data-dir" && args[4] == dir
+}
+func InstallHooks(home, dir, binary string, remove bool) (err error) {
 	claudePath := filepath.Join(home, ".claude", "settings.json")
 	data, err := os.ReadFile(claudePath)
 	if err != nil && !os.IsNotExist(err) {
@@ -55,7 +64,7 @@ func InstallHooks(home, dir, binary string, remove bool) error {
 			var others []any
 			for _, h := range hs {
 				v, _ := h.(map[string]any)
-				if str(v, "command") != command {
+				if !ownedClaudeHook(str(v, "command"), dir) {
 					others = append(others, h)
 				}
 			}
@@ -86,26 +95,29 @@ func InstallHooks(home, dir, binary string, remove bool) error {
 	backupPath := filepath.Join(dir, "notify-backup.json")
 	var backup HookBackup
 	existingBackup, _ := os.ReadFile(backupPath)
+	haveBackup := len(existingBackup) > 0 && json.Unmarshal(existingBackup, &backup) == nil
 	current := stringSlice(config["notify"])
+	installed := ownedCodexWrapper(current, dir)
 	var replacement []byte
+	createBackup := false
 	if remove {
-		if len(existingBackup) > 0 && json.Unmarshal(existingBackup, &backup) == nil && equalStrings(current, backup.Wrapper) {
+		if haveBackup && installed {
 			replacement, err = replaceNotify(codex, backup.Notify, backup.HadNotify)
 			if err != nil {
 				return err
 			}
 		}
 	} else {
-		if len(existingBackup) > 0 && json.Unmarshal(existingBackup, &backup) == nil && !equalStrings(current, backup.Wrapper) {
+		switch {
+		case haveBackup && !installed:
 			return errors.New("Codex notify changed since installation; remove the prior integration before reinstalling")
+		case !haveBackup && installed:
+			return errors.New("Codex notify already runs Agents, but the saved original command is missing")
+		case !haveBackup:
+			backup = HookBackup{Notify: current, HadNotify: config["notify"] != nil}
+			createBackup = true
 		}
-		if len(existingBackup) == 0 {
-			backup = HookBackup{Notify: current, HadNotify: config["notify"] != nil, Wrapper: []string{binary, "hook", "codex", "--data-dir", dir}}
-			if err = AtomicWrite(backupPath, wireJSON(backup)); err != nil {
-				return err
-			}
-		}
-		replacement, err = replaceNotify(codex, backup.Wrapper, true)
+		replacement, err = replaceNotify(codex, []string{binary, "hook", "codex", "--data-dir", dir}, true)
 		if err != nil {
 			return err
 		}
@@ -116,6 +128,19 @@ func InstallHooks(home, dir, binary string, remove bool) error {
 		if err = toml.Unmarshal(replacement, &check); err != nil {
 			return err
 		}
+	}
+	// The wrapper runs the saved original command, so the backup is written before
+	// the wrapper exists. A failed installation removes the backup it created, so a
+	// retry isn't refused as though Codex's configuration had changed.
+	if createBackup {
+		if err = AtomicWrite(backupPath, wireJSON(backup)); err != nil {
+			return err
+		}
+		defer func() {
+			if err != nil {
+				_ = os.Remove(backupPath)
+			}
+		}()
 	}
 	pretty, _ := json.MarshalIndent(settings, "", "  ")
 	if err = AtomicWrite(claudePath, append(pretty, '\n')); err != nil {
@@ -142,7 +167,6 @@ func stringSlice(v any) []string {
 	}
 	return out
 }
-func equalStrings(a, b []string) bool { return string(wireJSON(a)) == string(wireJSON(b)) }
 func replaceNotify(source []byte, value []string, present bool) ([]byte, error) {
 	lines := strings.SplitAfter(string(source), "\n")
 	start, end := -1, -1

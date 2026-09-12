@@ -51,6 +51,54 @@ One live `ps` sample showed approximately **107 MiB app + 34 MiB collector RSS**
 - Identity binding detects ordinary copied credentials on another machine; cloning the machine identity too is indistinguishable. Each ephemeral instance must receive a unique persistent identity and enrollment.
 - The hub uses one account/fleet and one SQLite process. It is not a public multi-tenant service. Remote control, arbitrary text sharing, broader history UI, and Phase 3 reply/stop/restart actions are intentionally absent.
 
+## Dogfooding fixes — September 10, 2026
+
+Changes made after a whole-project review, built and installed as `/Applications/Agents.app` on the owner's Mac, with lifecycle hooks enabled there.
+
+- **Hook episodes.** A Notification hook's request ID no longer derives from stale transcript activity, which could merge a second, different question into the first and suppress its notification. Re-announced prompts keep their episode; a different prompt or a prompt after resolution opens a new one.
+- **Hooks for new sessions.** Events from a session that inventory hasn't listed yet were dropped, so a new session's first permission prompt could be missed. They are now held for up to two minutes and replayed after the inventory refresh the event triggers.
+- **Vanished sessions.** A Claude session that disappears from inventory (removed or crashed) is marked ended and its pending request cleared. Previously a session last seen working stayed working indefinitely.
+- **Rescans.** The collector reacted to every write under `~/.codex`, including Codex's constantly updated logs database, and reconciled everything every three seconds regardless. It now ignores unrelated Codex files, re-queries Codex's database at most every 15 seconds unless relevant files change, and reconciles every 15 seconds.
+- **Outbox.** An unpaired collector wrote every session change to the remote outbox: 8,419 rows (26.8 MB) in about 2.5 hours. It now keeps no outbox until paired, since pairing exports the current projection. The live database went from 33 MB to 600 KB.
+- **App work.** The panel's SwiftUI tree exists only while it is open. The UI cache is written at most once a minute. Snapshot dates are parsed directly instead of through `ISO8601DateFormatter`, cutting one live snapshot decode from 24 ms to 1.7 ms. The collector coalesces snapshot bursts to one per second.
+- **Panel.** The three newest requests always show, whatever their age; the rest fold into Older requests. Idle Codex subagents appear as a count on their parent and take their Codex nickname as a title. Return toggles the selected row from the search field or the panel, and clicking a row selects it. The menu bar coverage dash no longer appears for permanently limited sources such as Codex's fallback.
+- **Accuracy log.** Each expanded session has a **Wrong state?** menu that records the verdict, the session's projection and source health to local `feedback.jsonl`. `agents-collector feedback-report` summarizes it.
+
+Measured on the owner's Mac, 2 minutes each, with this development session active:
+
+| | App | Collector | Combined |
+| --- | --- | --- | --- |
+| Before the fixes, panel closed | 0.66% | 1.63% | 2.29% |
+| After the fixes, panel closed, screen locked | 0.24% | 0.51% | 0.75% |
+| After review fixes and cleanup, panel closed, screen locked | 0.16% | 0.30% | 0.46% |
+
+The screen lock pauses menu bar blinking, so the app figure is a lower bound for normal use. A hook invocation takes about 10 ms.
+
+Live checks: the collector's six attention requests and two working sessions matched `claude agents --json`; a permission-prompt hook payload sent through the installed hook binary appeared within a second as a permission request with provider-event evidence, survived the next inventory refresh, and cleared on `PostToolUse`; hook timestamps from a newly started real Claude session updated on tool use; the status item's accessibility label reported no missing sources.
+
+Not verified: keyboard handling (Return and arrows) and the panel teardown in live interaction, because the screen was locked; a genuine interactive permission prompt, because this Mac's settings approved the test sessions' commands automatically.
+
+First accuracy question for the acceptance run: Claude reports finished background sessions that are waiting for the next prompt as `blocked`, which Agents counts as a question. Several of the six requests read as completion reports. Use the Wrong state? log to decide whether those belong in Ready to review.
+
+## Code review fixes — September 10, 2026
+
+A high-effort review of the initial commit found twelve issues. Three were already fixed by the dogfooding changes above (the permanent Codex dash, the unpaired outbox, and sessions removed from Claude's inventory). The rest were fixed on the same branch:
+
+- A permission request stayed pending through a long tool run after approval. A later inventory reporting the session working now resolves it, and only pending hook requests are pinned against snapshots.
+- `SessionStart` (also sent on resume and `/compact`) no longer marks a session working.
+- A Codex turn killed mid-run stayed working and marked its source stale. Silent turns stop counting as working after 30 minutes (six hours with an open tool call), and connectivity is left alone.
+- A machine without Claude Code or Codex showed a missing-source dash forever. Missing providers are now reported as unsupported.
+- Reconnecting to a hub replayed up to seven days of superseded events ahead of current state. The outbox now keeps the newest event per session.
+- Re-enabling hooks after moving the app duplicated Claude hooks and kept the old Codex wrapper. Ownership is recognized by data directory, and reinstalling replaces the entries.
+- A failed hook installation left a backup that made every retry fail. The previous backup state is restored on failure.
+- The file watcher stopped reading errors after the first one, which can stall event delivery. Errors are drained.
+- Every hook, including each tool call, forced `claude agents` to run. Only lifecycle and prompt events request an inventory, at most every three seconds.
+- An interrupted Claude turn showed as working. “[Request interrupted by user]” now ends the turn.
+- The history-gap warning never cleared. It now clears an hour after the condition stops.
+- Ad-hoc signing lost Keychain access on every rebuild. The build now signs with an Apple Development or Developer ID identity when one exists.
+
+Each has a regression test. A follow-up cleanup pass replaced the special cases that let inventory and removed sessions override a hook-opened prompt with one rule: a prompt stays pending until turn activity or a source vouching that the session isn't waiting comes after it, with inventory trusted from five seconds before it ran. Hooks no longer wait on a refresh in progress, hooks from unknown sessions are queued with only the fields that are read, and tool events from them are dropped. Live check: a permission-prompt hook on a finished session appeared immediately and cleared after the next inventory. The Go suite is 29 tests and passes with the race detector.
+
 ## UI refinements
 
 The panel now fills its native window, uses three-quarters of the current display's available height, and anchors two points below the menu bar. Older/idle group headers toggle across the entire row. Session rows expand and collapse in place, support several open sessions, and keep expanded completed output visible while it is being reviewed. Search still reveals matching groups, which can then be collapsed normally.

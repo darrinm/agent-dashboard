@@ -11,12 +11,13 @@ struct PanelView: View {
     @AppStorage("shortcut") private var shortcut="optionSpace"
     @AppStorage("appearance") private var appearance="system"
     @State private var keyboardID:String?
+    @State private var lastReturn=Date.distantPast
     var body: some View {
         VStack(spacing:0) {
             header
             if model.settings { settings } else { list }
             Divider().opacity(0.6)
-            HStack(spacing:8) {Image(systemName:"magnifyingglass").foregroundStyle(.secondary);TextField("Jump to session",text:$model.search).textFieldStyle(.plain).focused($searchFocused).onChange(of:model.search){ _,query in keyboardID=nil;if !query.isEmpty{model.showOlder=true;model.showIdle=true} }.onSubmit{if let s=navigationRows.first(where:{$0.id==keyboardID}) ?? navigationRows.first{model.toggleExpansion(s)}};Text(shortcut=="controlOptionSpace" ? "⌃⌥ Space":shortcut=="commandShiftSpace" ? "⇧⌘ Space":"⌥ Space").font(.system(size:10,design:.monospaced)).foregroundStyle(.secondary)}.padding(14)
+            HStack(spacing:8) {Image(systemName:"magnifyingglass").foregroundStyle(.secondary);TextField("Jump to session",text:$model.search).textFieldStyle(.plain).focused($searchFocused).onChange(of:model.search){ _,query in keyboardID=nil;if !query.isEmpty{model.showOlder=true;model.showIdle=true} }.onSubmit{_=returnPressed()};Text(shortcut=="controlOptionSpace" ? "⌃⌥ Space":shortcut=="commandShiftSpace" ? "⇧⌘ Space":"⌥ Space").font(.system(size:10,design:.monospaced)).foregroundStyle(.secondary)}.padding(14)
         }
         .frame(width:412)
         .frame(maxHeight:.infinity,alignment:.top)
@@ -24,15 +25,26 @@ struct PanelView: View {
         .clipShape(RoundedRectangle(cornerRadius:20))
         .preferredColorScheme(appearance=="dark" ? .dark:appearance=="light" ? .light:nil)
         .overlay(RoundedRectangle(cornerRadius:20).strokeBorder(.white.opacity(0.13),lineWidth:1))
-        .onReceive(NotificationCenter.default.publisher(for:Notification.Name("AgentsPanelOpened"))){ _ in searchFocused=true }
+        .onAppear{searchFocused=true} // The view tree is rebuilt each time the panel opens.
+        // Return can arrive here or through the search field's onSubmit, depending on focus.
+        .onKeyPress(.return){ returnPressed() ? .handled:.ignored }
         .onKeyPress(keys:[.upArrow,.downArrow]){press in
-            guard !model.settings,!navigationRows.isEmpty else{return .ignored}
-            let current=navigationRows.firstIndex(where:{$0.id==keyboardID}) ?? (press.key == .downArrow ? -1:navigationRows.count)
-            let next=max(0,min(navigationRows.count-1,current+(press.key == .downArrow ? 1:-1)))
-            keyboardID=navigationRows[next].id;return .handled
+            let rows=navigationRows
+            guard !model.settings,!rows.isEmpty else{return .ignored}
+            let current=rows.firstIndex(where:{$0.id==keyboardID}) ?? (press.key == .downArrow ? -1:rows.count)
+            let next=max(0,min(rows.count-1,current+(press.key == .downArrow ? 1:-1)))
+            keyboardID=rows[next].id;return .handled
         }
         .onExitCommand { if !model.expandedIDs.isEmpty {model.expandedIDs.removeAll()} else {NotificationCenter.default.post(name:Notification.Name("AgentsClosePanel"),object:nil)} }
         .alert("Agents",isPresented:Binding(get:{model.actionError != nil},set:{if !$0{model.actionError=nil}})){Button("OK"){model.actionError=nil}.help("Dismiss this message")} message:{Text(model.actionError ?? "")}
+    }
+    /// Toggles the keyboard selection, or the first row when nothing is selected.
+    /// A single key press can reach both handlers, so repeats within 0.2 s are ignored.
+    private func returnPressed()->Bool {
+        let rows=navigationRows
+        guard !model.settings,let s=rows.first(where:{$0.id==keyboardID}) ?? rows.first else{return false}
+        if Date().timeIntervalSince(lastReturn)<0.2 {return true}
+        lastReturn=Date();keyboardID=s.id;model.toggleExpansion(s);return true
     }
     private var header: some View {
         VStack(alignment:.leading,spacing:14) {
@@ -42,41 +54,49 @@ struct PanelView: View {
             if let issue=model.sources.first(where:{$0.status=="unavailable"||$0.status=="error"||$0.status=="degraded"}) {Label(issue.name+(issue.status=="degraded" ? " · limited coverage":" not reporting"),systemImage:"exclamationmark.circle").font(.system(size:11)).foregroundStyle(Palette.amber)}
         }.padding(20)
     }
-    private var filtered:[AgentSession] {model.sessions.filter {s in model.search.isEmpty || "\(s.title) \(s.project) \(s.machine) \(s.provider)".localizedCaseInsensitiveContains(model.search)}}
-    private var navigationRows:[AgentSession] {filtered.filter{s in s.needsYou ? (!s.older || model.showOlder) : (s.execution=="working" || model.reviewVisible(s) || model.showIdle)}}
+    // Nested subagents appear as a count on their parent row, and still match a search.
+    private var filtered:[AgentSession] {model.sessions.filter {s in model.search.isEmpty ? !model.nestedIDs.contains(s.id) : "\(s.title) \(s.project) \(s.machine) \(s.provider)".localizedCaseInsensitiveContains(model.search)}}
+    private var navigationRows:[AgentSession] {
+        let sessions=filtered
+        let folded=Set(partitionRequests(sessions.filter(\.needsYou)).folded.map(\.id))
+        return sessions.filter{s in s.needsYou ? (!folded.contains(s.id) || model.showOlder) : (s.execution=="working" || model.reviewVisible(s) || model.showIdle)}
+    }
     private var list: some View {
         ScrollViewReader{proxy in
         ScrollView {
             LazyVStack(spacing:4) {
+                let sessions=filtered // Filtering runs a text match per session; do it once per update.
                 if model.sessions.isEmpty {ContentUnavailableView {Label("No sessions yet",systemImage:"antenna.radiowaves.left.and.right")} description:{Text("Start Claude Code or Codex using your usual workflow. Sources appear here automatically.")} actions:{Button("Set up Agents"){NotificationCenter.default.post(name:Notification.Name("AgentsShowHelp"),object:nil)}.help("Open the getting-started guide")}.padding(.vertical,20)}
-                let needs=filtered.filter(\.needsYou)
+                let needs=sessions.filter(\.needsYou)
                 if !needs.isEmpty { sectionLabel("NEEDS YOU",count:needs.count,tint:Palette.amber)
-                    ForEach(needs.filter{!$0.older}) { row($0) }
-                    let older=needs.filter(\.older)
-                    if !older.isEmpty {DisclosureGroup(isExpanded:$model.showOlder){ForEach(older){row($0)}} label:{HStack{Text("Older requests");Spacer();Text("\(older.count) · over 7 days").foregroundStyle(.secondary)}.font(.system(size:12)).padding(.vertical,8)}.disclosureGroupStyle(FullRowDisclosureStyle()).padding(.horizontal,12)}
+                    let requests=partitionRequests(needs)
+                    ForEach(requests.shown) { row($0) }
+                    let older=requests.folded
+                    if !older.isEmpty {DisclosureGroup(isExpanded:$model.showOlder){ForEach(older){row($0)}} label:{HStack{Text("Older requests");Spacer();Text("\(older.count) more · over 7 days").foregroundStyle(.secondary)}.font(.system(size:12)).padding(.vertical,8)}.disclosureGroupStyle(FullRowDisclosureStyle()).padding(.horizontal,12)}
                 }
-                let working=filtered.filter{!$0.needsYou&&$0.execution=="working"}
+                let working=sessions.filter{!$0.needsYou&&$0.execution=="working"}
                 if !working.isEmpty {sectionLabel("WORKING",count:working.count,tint:Palette.activity);ForEach(working){row($0)}}
-                let reviews=filtered.filter{!$0.needsYou&&$0.execution != "working"&&model.reviewVisible($0)}
+                let reviews=sessions.filter{!$0.needsYou&&$0.execution != "working"&&model.reviewVisible($0)}
                 if !reviews.isEmpty {sectionLabel("READY TO REVIEW",count:reviews.count);ForEach(reviews){row($0)}}
-                let idle=filtered.filter{!$0.needsYou&&$0.execution != "working" && !model.reviewVisible($0)}
+                let idle=sessions.filter{!$0.needsYou&&$0.execution != "working" && !model.reviewVisible($0)}
                 if !idle.isEmpty {DisclosureGroup(isExpanded:$model.showIdle){ForEach(idle){row($0)}} label:{Text("Idle and disconnected · \(idle.count)").font(.system(size:12)).foregroundStyle(.secondary).padding(.vertical,10)}.disclosureGroupStyle(FullRowDisclosureStyle()).padding(.horizontal,12)}
-                if filtered.isEmpty && !model.sessions.isEmpty{Text("No matching sessions").foregroundStyle(.secondary).padding(24)}
+                if sessions.isEmpty && !model.sessions.isEmpty{Text("No matching sessions").foregroundStyle(.secondary).padding(24)}
             }.padding(.horizontal,8).padding(.bottom,12)
         }.frame(maxHeight:.infinity).onChange(of:keyboardID){_,id in if let id=id{proxy.scrollTo(id,anchor:.center)}}
             .onChange(of:model.revealID){_,id in if let id=id{DispatchQueue.main.async{proxy.scrollTo(id,anchor:.top)}}}
-            .onReceive(NotificationCenter.default.publisher(for:Notification.Name("AgentsPanelOpened"))){_ in if let id=model.revealID{DispatchQueue.main.async{proxy.scrollTo(id,anchor:.top)}}}
+            .onAppear{if let id=model.revealID{DispatchQueue.main.async{proxy.scrollTo(id,anchor:.top)}}}
         }
     }
     private func sectionLabel(_ title:String,count:Int,tint:Color = .secondary)->some View {HStack{Text(title).tracking(1.4);Spacer();Text(String(format:"%02d",count)).monospacedDigit()}.font(.system(size:10,weight:.semibold)).foregroundStyle(tint).padding(.horizontal,12).padding(.top,10).padding(.bottom,5)}
     private func row(_ s:AgentSession)->some View {
         VStack(spacing:0) {
-        Button {keyboardID=nil;model.toggleExpansion(s)} label:{
+        Button {keyboardID=s.id;searchFocused=true;model.toggleExpansion(s)} label:{
             HStack(alignment:.top,spacing:10) {
                 Image(systemName:s.symbol).font(.system(size:12)).foregroundStyle(s.color).frame(width:16).padding(.top,3)
                 VStack(alignment:.leading,spacing:5) {
                     HStack(alignment:.firstTextBaseline){Text(s.title).font(.system(size:13,weight:.medium)).lineLimit(model.expandedIDs.contains(s.id) ? nil:1);Spacer(minLength:4);Text(s.provider=="claude" ? "Claude":"Codex").font(.system(size:10,weight:.medium)).foregroundStyle(.secondary);Image(systemName:model.expandedIDs.contains(s.id) ? "chevron.up":"chevron.down").font(.system(size:9,weight:.semibold)).foregroundStyle(.tertiary)}
-                    Text("\(s.project) · \(s.machine == model.machine ? "This Mac":s.machine)\(s.parentID == nil ? "":" · subagent")").font(.system(size:11)).foregroundStyle(.secondary).lineLimit(1)
+                    let subagents=model.subagentCounts[s.id] ?? 0
+                    Text("\(s.project) · \(s.machine == model.machine ? "This Mac":s.machine)\(s.parentID == nil ? "":" · subagent")\(subagents>0 ? " · \(subagents) subagent\(subagents==1 ? "":"s")":"")").font(.system(size:11)).foregroundStyle(.secondary).lineLimit(1)
                     if !model.expandedIDs.contains(s.id) && !s.summary.isEmpty{Text(MarkdownDocument.parsed(s.summary).preview).font(.system(size:12)).foregroundStyle(s.needsYou ? s.color:.secondary).lineLimit(2).multilineTextAlignment(.leading)}
                     HStack {Text(s.connectivity=="online" ? (s.needsYou ? "Waiting \(age(s.attention!.openedAt))":s.status):"\(s.connectivity.capitalized) · last seen \(age(s.observedAt)) ago").font(.system(size:10)).foregroundStyle(.secondary);Spacer();if s.execution=="working" && !s.needsYou {if s.hasActivity {ActivityLine(buckets:s.buckets).frame(width:85,height:20)} else {Text("No activity data").font(.system(size:10)).foregroundStyle(.secondary)}}}
                 }
@@ -93,7 +113,14 @@ struct PanelView: View {
             if s.execution=="working"&&s.openTools==0&&Date().timeIntervalSince(s.lastActivity)>600{Text("Quiet \(age(s.lastActivity)) · no open tool call observed").font(.system(size:12)).foregroundStyle(.secondary)}
             HStack {if s.capabilities.contains("attach"){Button("Attach in Ghostty"){model.attach(s)}.disabled(!model.connected||s.connectivity != "online").help(!model.connected || s.connectivity != "online" ? "Attach is unavailable while this session’s source is offline":"Attach to the existing Claude session in Ghostty")};if !s.remote,s.cwd != nil {Button("Open project"){model.openProject(s)}.help("Open this session’s project folder in Finder")}}
             HStack {if !s.remote,s.transcript != nil{Button("Reveal transcript"){model.revealTranscript(s)}.help("Show this session’s transcript file in Finder")};Button("Copy session ID"){NSPasteboard.general.clearContents();NSPasteboard.general.setString(s.nativeID,forType:.string)}.help("Copy the provider’s session ID to the clipboard")}.controlSize(.small)
-            if s.needsYou{Button("Snooze notifications for 1 hour"){model.acknowledge(s,"snooze")}.controlSize(.small).help("Pause notifications for this request for one hour; the request stays pending")}
+            HStack {
+                if s.needsYou{Button("Snooze notifications for 1 hour"){model.acknowledge(s,"snooze")}.help("Pause notifications for this request for one hour; the request stays pending")}
+                Menu("Wrong state?") {
+                    if s.needsYou {Button("It isn’t waiting for me"){model.reportWrongState(s,verdict:"not_waiting")}}
+                    else {Button("It is waiting for me"){model.reportWrongState(s,verdict:"is_waiting")}}
+                    Button("Something else is wrong"){model.reportWrongState(s,verdict:"wrong_state")}
+                }.menuStyle(.borderlessButton).fixedSize().help("Record this session’s shown state and evidence so wrong states can be reviewed")
+            }.controlSize(.small)
             if s.evidence=="inferred"{Label("Based on saved activity; live status may differ.",systemImage:"info.circle").font(.system(size:11)).foregroundStyle(.secondary).help("Agents reads recorded session activity. It may not see a newer live state or a pending approval until the source records it.")}
             Text("Last activity \(age(s.lastActivity)) ago · \(s.connectivity)").font(.system(size:11)).foregroundStyle(.secondary)
         }.padding(.leading,37).padding(.trailing,11).padding(.bottom,16).onAppear{model.saw(s)}

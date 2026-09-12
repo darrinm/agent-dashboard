@@ -106,6 +106,9 @@ func SyncRemote(ctx context.Context, s *Store, dir string) {
 	configuration := ""
 	connectivity := map[string]string{}
 	hostID := machineIdentity()
+	// Superseded events only pile up while delivery is failing, so coalesce on
+	// the first attempt and after each failure rather than on every tick.
+	coalesce := true
 	for {
 		select {
 		case <-ctx.Done():
@@ -152,6 +155,10 @@ func SyncRemote(ctx context.Context, s *Store, dir string) {
 				}
 			}
 		}
+		if coalesce {
+			_ = s.CoalesceOutbox()
+			coalesce = false
+		}
 		rows, err := s.DB.Query("SELECT seq,body FROM events WHERE sent=0 ORDER BY seq LIMIT 50")
 		if err != nil {
 			continue
@@ -194,6 +201,7 @@ func SyncRemote(ctx context.Context, s *Store, dir string) {
 			}
 		}
 		if err != nil {
+			coalesce = true
 			s.Health(Health{ID: "hub", Name: "Remote hub", Status: "unavailable", Detail: Clip(err.Error(), 150)})
 			nextAttempt = time.Now().Add(backoff + time.Duration(rand.Int64N(int64(backoff/2))))
 			backoff = min(backoff*2, time.Minute)
@@ -453,9 +461,17 @@ func (s *Store) Ingest(device string, v Transfer) error {
 		return e
 	}
 	s.sessions[session.ID] = session
-	s.seq = eventSeq
+	s.seq = max(s.seq+1, eventSeq)
 	s.wake()
 	return nil
+}
+
+// CoalesceOutbox keeps only the newest unsent event for each session. The hub
+// ignores older sequences anyway, and sending days of superseded events first
+// after a reconnect would present stale requests as current.
+func (s *Store) CoalesceOutbox() error {
+	_, err := s.DB.Exec(`DELETE FROM events WHERE sent=0 AND seq NOT IN (SELECT MAX(seq) FROM events WHERE sent=0 GROUP BY session_id)`)
+	return err
 }
 
 func (s *Store) DeleteRemote(id string) error {

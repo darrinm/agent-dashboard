@@ -116,14 +116,29 @@ func LocalAPI(store *Store, discovery *Discovery) http.Handler {
 		if !send() {
 			return
 		}
+		last := time.Now()
 		for {
 			select {
 			case <-r.Context().Done():
 				return
 			case <-ch:
+				// Coalesce bursts (for example hook events from active sessions) into
+				// at most one full snapshot per second.
+				if wait := time.Second - time.Since(last); wait > 0 {
+					select {
+					case <-time.After(wait):
+					case <-r.Context().Done():
+						return
+					}
+				}
+				select { // This send covers any change signalled during the wait.
+				case <-ch:
+				default:
+				}
 				if !send() {
 					return
 				}
+				last = time.Now()
 			case <-tick.C:
 				if !send() {
 					return
@@ -154,6 +169,29 @@ func LocalAPI(store *Store, discovery *Discovery) http.Handler {
 		}
 		respond(w, map[string]bool{"ok": true})
 	})
+	mux.HandleFunc("POST /v1/feedback", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			SessionID string `json:"sessionID"`
+			Verdict   string `json:"verdict"`
+			Note      string `json:"note"`
+		}
+		if readJSON(r, &req) != nil {
+			http.Error(w, "invalid request", 400)
+			return
+		}
+		if err := store.RecordFeedback(req.SessionID, req.Verdict, req.Note); err != nil {
+			switch {
+			case errors.Is(err, ErrUnknownSession):
+				http.Error(w, err.Error(), http.StatusNotFound)
+			case errors.Is(err, ErrInvalidFeedback):
+				http.Error(w, err.Error(), http.StatusBadRequest)
+			default:
+				http.Error(w, "Could not save feedback", http.StatusInternalServerError)
+			}
+			return
+		}
+		respond(w, map[string]bool{"ok": true})
+	})
 	mux.HandleFunc("POST /v1/hooks/{provider}", func(w http.ResponseWriter, r *http.Request) {
 		var event map[string]any
 		if readJSON(r, &event) != nil {
@@ -165,12 +203,10 @@ func LocalAPI(store *Store, discovery *Discovery) http.Handler {
 			http.Error(w, "unknown provider", 400)
 			return
 		}
-		ApplyHook(store, provider, event)
+		at := time.Now().UTC()
+		result := ApplyHook(store, provider, event, at)
 		if discovery != nil {
-			select {
-			case discovery.Wake <- struct{}{}:
-			default:
-			}
+			discovery.HookReceived(provider, event, result, at)
 		}
 		respond(w, map[string]bool{"ok": true})
 	})
@@ -239,23 +275,26 @@ func RunCollector(ctx context.Context, o Options) error {
 			case <-ctx.Done():
 				return
 			case <-d.Wake:
-				d.mu.Lock()
-				d.lastInventory = time.Time{}
-				d.mu.Unlock()
 				dirty = true
-			case _, ok := <-events:
+			case event, ok := <-events:
 				if !ok {
 					events = nil
-				} else {
+					break
+				}
+				if d.NoteFileEvent(event.Name) {
 					dirty = true
 				}
-			case <-errs:
-				errs = nil
+			case _, ok := <-errs:
+				// Keep draining: fsnotify stops delivering events while an error is unread.
+				if !ok {
+					errs = nil
+				}
 			case <-tick.C:
-				if dirty && time.Since(last) >= time.Second || time.Since(last) >= 3*time.Second {
-					d.Refresh(ctx)
+				// File events are hints; reconcile everything periodically regardless.
+				if dirty && time.Since(last) >= time.Second || time.Since(last) >= reconcileInterval {
+					// Stay dirty while a requested inventory is deferred.
+					dirty = d.Refresh(ctx)
 					last = time.Now()
-					dirty = false
 					if watcher != nil {
 						d.mu.Lock()
 						for path := range d.tails {
@@ -279,64 +318,97 @@ func RunCollector(ctx context.Context, o Options) error {
 	}
 	return err
 }
-func ApplyHook(store *Store, provider string, m map[string]any) {
+// HookResult tells the caller of ApplyHook what else a hook calls for.
+type HookResult int
+
+const (
+	HookApplied        HookResult = iota
+	HookUnknownSession            // the store doesn't have the session yet
+	HookNeedsInventory            // the event can change what Claude's inventory reports
+)
+
+// lifecycleEvent reports whether a Claude hook event can change what inventory
+// reports, as opposed to per-turn events such as tool use.
+func lifecycleEvent(name string) bool {
+	switch name {
+	case "SessionStart", "SessionEnd", "Stop", "Notification", "PermissionRequest":
+		return true
+	}
+	return false
+}
+
+// ApplyHook applies a lifecycle event that happened at the given time to a known session.
+func ApplyHook(store *Store, provider string, m map[string]any, at time.Time) HookResult {
 	id := str(m, "session_id")
-	if provider == "codex" {
-		id = str(m, "thread-id")
-	}
-	if id == "" {
-		return
-	}
-	key := Key(store.MachineID, provider, id)
-	s, ok := store.Get(key)
-	if !ok {
-		return
-	}
-	now := time.Now().UTC()
 	event := str(m, "hook_event_name")
 	if provider == "codex" {
-		event = str(m, "type")
+		id, event = str(m, "thread-id"), str(m, "type")
 	}
+	if id == "" {
+		return HookApplied
+	}
+	s, ok := store.Get(Key(store.MachineID, provider, id))
+	if !ok {
+		return HookUnknownSession
+	}
+	result := HookApplied
+	if provider == "claude" && lifecycleEvent(event) {
+		result = HookNeedsInventory
+	}
+	previousHook := s.HookAt
 	s.Evidence = "provider event"
-	s.ObservedAt = now
-	s.HookAt = now
+	s.ObservedAt = time.Now().UTC()
+	s.HookAt = at
 	switch event {
 	case "Notification":
 		typ := str(m, "notification_type")
 		if typ != "permission_prompt" && typ != "elicitation_dialog" && typ != "agent_needs_input" {
-			return
+			return result
 		}
-		s.RequestKind = "question"
+		kind := "question"
 		if typ == "permission_prompt" {
-			s.RequestKind = "permission"
+			kind = "permission"
 		}
-		s.RequestKey = "hook:" + s.LastActivity.Format(time.RFC3339Nano) + ":" + typ
-		s.StateSince = now
-		s.Summary = Clip(str(m, "message"), 600)
+		message := Clip(str(m, "message"), 600)
+		// A prompt announced again with no activity in between keeps its episode.
+		// A different prompt, or any prompt after the last one resolved, is new,
+		// even when transcript activity hasn't been read yet.
+		repeated := s.RequestKind == kind && strings.HasPrefix(s.RequestKey, "hook:") && s.Summary == message &&
+			!previousHook.IsZero() && !s.LastActivity.After(previousHook)
+		s.RequestKind = kind
+		if !repeated {
+			s.RequestKey = "hook:" + typ + ":" + at.Format(time.RFC3339Nano)
+			s.StateSince = at
+		}
+		s.Summary = message
 	case "PermissionRequest":
+		request := str(m, "tool_use_id")
+		if request == "" {
+			request = at.Format(time.RFC3339Nano)
+		}
 		s.RequestKind = "permission"
-		s.RequestKey = "hook:" + str(m, "tool_use_id") + ":" + s.LastActivity.Format(time.RFC3339Nano)
-		s.StateSince = now
+		s.RequestKey = "hook:" + request
+		s.StateSince = at
 		s.Summary = "Permission requested for " + str(m, "tool_name")
-	case "UserPromptSubmit", "SessionStart":
+	case "UserPromptSubmit":
 		s.Execution = "working"
 		s.RequestKind = ""
-		s.StateSince = now
-		s.LastActivity = now
+		s.StateSince = at
+		s.LastActivity = at
 	case "PostToolUse":
 		s.Execution = "working"
 		s.RequestKind = ""
-		s.LastActivity = now
-	case "Stop", "agent-turn-complete":
-		// Completion hooks do not establish whether the result is a question or work
-		// ready to review. Inventory and transcript reconciliation decide that.
-		return
+		s.LastActivity = at
 	case "SessionEnd":
 		s.Execution = "ended"
 		s.RequestKind = ""
-		s.LastActivity = now
+		s.LastActivity = at
 	default:
-		return
+		// SessionStart also fires on resume, /clear and /compact, which don't start a
+		// turn, and completion hooks don't say whether the result is a question or
+		// work to review. The refresh these events request decides.
+		return result
 	}
 	_ = store.Apply(s)
+	return result
 }
