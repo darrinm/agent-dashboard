@@ -2,6 +2,8 @@ module agents.local/dashboard
 
 go 1.24.0
 
+toolchain go1.26.10
+
 require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/pelletier/go-toml/v2 v2.0.6
